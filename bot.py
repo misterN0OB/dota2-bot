@@ -9,6 +9,7 @@ from telegram import (
     ReplyKeyboardMarkup,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
+    WebAppInfo,
 )
 from telegram.ext import (
     Application,
@@ -62,6 +63,9 @@ SETTINGS_CHOOSE = 20
 
 # ── Главная клавиатура ─────────────────────────────────────────────────────────
 
+# Замени на свой URL после деплоя на Vercel
+MINIAPP_URL = "https://YOUR_PROJECT.vercel.app"
+
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
         ["🔍 Проверить цену"],
@@ -70,6 +74,10 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True,
 )
+
+MINIAPP_BUTTON = InlineKeyboardMarkup([[
+    InlineKeyboardButton("🎮 Открыть трекер цен", web_app=WebAppInfo(url=MINIAPP_URL))
+]])
 
 
 # ── /start ─────────────────────────────────────────────────────────────────────
@@ -101,6 +109,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Выбери что хочешь сделать:",
         parse_mode="HTML",
         reply_markup=MAIN_KEYBOARD,
+    )
+    await update.message.reply_text(
+        "Или открой полный трекер с графиками и портфелем 👇",
+        reply_markup=MINIAPP_BUTTON,
     )
 
 

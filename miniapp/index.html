@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dota 2 Price Tracker</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #0d0d14;
+    --surface:  #16161f;
+    --card:     #1e1e2e;
+    --border:   #2a2a3e;
+    --accent:   #c8292d;
+    --gold:     #c89b3c;
+    --gold-dim: #8a6b28;
+    --text:     #e8e8f0;
+    --text-dim: #888899;
+    --green:    #3caa6e;
+    --red:      #c84040;
+    --radius:   10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 70px;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #0d0d14 0%, #1a0a0a 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-logo {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .header-title { font-size: 17px; font-weight: 700; color: var(--gold); letter-spacing: 0.3px; }
+  .currency-badge {
+    margin-left: auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 13px;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .currency-badge:active { opacity: 0.7; }
+
+  /* ── Nav ── */
+  .nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    z-index: 100;
+  }
+  .nav-btn {
+    flex: 1;
+    padding: 10px 4px 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: none; border: none; color: var(--text-dim);
+    font-size: 10px; cursor: pointer; transition: color 0.15s;
+  }
+  .nav-btn .icon { font-size: 20px; }
+  .nav-btn.active { color: var(--gold); }
+  .nav-btn:active { opacity: 0.7; }
+
+  /* ── Pages ── */
+  .page { display: none; padding: 16px; }
+  .page.active { display: block; }
+
+  /* ── Search ── */
+  .search-box {
+    display: flex; gap: 8px; margin-bottom: 16px;
+  }
+  .search-input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus { border-color: var(--gold-dim); }
+  .search-input::placeholder { color: var(--text-dim); }
+  .search-btn {
+    background: var(--accent);
+    border: none; border-radius: var(--radius);
+    padding: 12px 18px; color: #fff;
+    font-size: 15px; cursor: pointer; font-weight: 600;
+    transition: opacity 0.15s;
+  }
+  .search-btn:active { opacity: 0.8; }
+
+  .results-list { display: flex; flex-direction: column; gap: 8px; }
+  .result-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .result-item:active { border-color: var(--gold-dim); }
+  .result-name { font-size: 14px; font-weight: 500; }
+  .result-arrow { color: var(--text-dim); font-size: 12px; }
+
+  /* ── Price Card ── */
+  .price-card {
+    background: linear-gradient(135deg, var(--card) 0%, #1a0f0f 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 12px;
+  }
+  .price-card-name { font-size: 15px; font-weight: 600; color: var(--gold); margin-bottom: 14px; line-height: 1.4; }
+  .price-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .price-label { font-size: 13px; color: var(--text-dim); }
+  .price-value { font-size: 18px; font-weight: 700; color: var(--text); }
+  .price-value.main { font-size: 24px; color: var(--gold); }
+  .price-meta { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  .price-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .btn {
+    flex: 1; padding: 10px; border: none; border-radius: var(--radius);
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+  }
+  .btn:active { opacity: 0.8; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+  .btn-gold { background: var(--gold); color: #000; }
+
+  /* ── Empty / Loading states ── */
+  .empty-state {
+    text-align: center; padding: 40px 20px;
+    color: var(--text-dim); font-size: 14px;
+  }
+  .empty-state .emoji { font-size: 40px; margin-bottom: 12px; }
+  .loading { text-align: center; padding: 30px; color: var(--text-dim); }
+  .spinner {
+    display: inline-block; width: 24px; height: 24px;
+    border: 2px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-bottom: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Watchlist / Portfolio items ── */
+  .item-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .item-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .item-card-name { font-size: 14px; font-weight: 600; flex: 1; margin-right: 8px; line-height: 1.3; }
+  .item-card-delete {
+    background: none; border: none; color: var(--text-dim);
+    font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1;
+  }
+  .item-card-delete:active { color: var(--red); }
+  .item-card-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .item-card-label { color: var(--text-dim); }
+  .item-card-value { font-weight: 600; }
+  .profit-positive { color: var(--green); }
+  .profit-negative { color: var(--red); }
+  .threshold-below { color: var(--green); }
+
+  /* ── Portfolio summary ── */
+  .portfolio-summary {
+    background: linear-gradient(135deg, #1a0f0f 0%, var(--card) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex; gap: 16px;
+  }
+  .summary-block { flex: 1; text-align: center; }
+  .summary-label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+  .summary-value { font-size: 17px; font-weight: 700; }
+
+  /* ── FAB ── */
+  .fab {
+    position: fixed;
+    bottom: 78px; right: 16px;
+    width: 52px; height: 52px;
+    background: var(--accent);
+    border: none; border-radius: 50%;
+    color: #fff; font-size: 26px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; box-shadow: 0 4px 16px rgba(200,41,45,0.4);
+    transition: opacity 0.15s;
+    z-index: 90;
+  }
+  .fab:active { opacity: 0.8; }
+  .fab.hidden { display: none; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: flex-end;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    padding: 20px 16px 32px;
+    width: 100%;
+    animation: slide-up 0.2s ease;
+  }
+  @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; color: var(--gold); }
+  .modal-input {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    margin-bottom: 12px;
+  }
+  .modal-input:focus { border-color: var(--gold-dim); }
+  .modal-buttons { display: flex; gap: 8px; }
+
+  /* ── Section title ── */
+  .section-title {
+    font-size: 12px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.8px;
+    margin-bottom: 10px; margin-top: 4px;
+  }
+
+  /* ── Graph page ── */
+  .graph-search { margin-bottom: 16px; }
+  .chart-container {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .chart-title { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
+
+  /* ── Currency selector ── */
+  .currency-list { display: flex; flex-direction: column; gap: 8px; }
+  .currency-option {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    transition: border-color 0.15s;
+  }
+  .currency-option.selected { border-color: var(--gold); }
+  .currency-option:active { opacity: 0.8; }
+  .currency-option-name { font-size: 15px; font-weight: 500; }
+  .currency-option-sym { font-size: 14px; color: var(--text-dim); }
+  .currency-check { color: var(--gold); font-size: 16px; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%);
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 8px 18px;
+    font-size: 13px; color: var(--text);
+    z-index: 300; opacity: 0; transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-logo">🎮</div>
+  <div class="header-title">Dota 2 Prices</div>
+  <div class="currency-badge" onclick="openCurrencyModal()" id="currencyBadge">RUB</div>
+</div>
+
+<!-- Pages -->
+<div id="page-search" class="page active">
+  <div class="search-box">
+    <input class="search-input" id="searchInput" placeholder="Название предмета..." autocomplete="off"
+      onkeydown="if(event.key==='Enter') doSearch()">
+    <button class="search-btn" onclick="doSearch()">🔍</button>
+  </div>
+  <div id="searchResults"></div>
+</div>
+
+<div id="page-watchlist" class="page">
+  <div id="watchlistContent"></div>
+</div>
+
+<div id="page-portfolio" class="page">
+  <div id="portfolioContent"></div>
+</div>
+
+<div id="page-chart" class="page">
+  <div class="graph-search">
+    <div class="search-box">
+      <input class="search-input" id="chartSearchInput" placeholder="Название предмета..." autocomplete="off"
+        onkeydown="if(event.key==='Enter') doChartSearch()">
+      <button class="search-btn" onclick="doChartSearch()">🔍</button>
+    </div>
+    <div id="chartSearchResults"></div>
+  </div>
+  <div id="chartContainer" style="display:none">
+    <div class="chart-container">
+      <div class="chart-title" id="chartTitle">История цены</div>
+      <canvas id="priceChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Nav -->
+<nav class="nav">
+  <button class="nav-btn active" data-page="search" onclick="switchPage('search', this)">
+    <span class="icon">🔍</span>Поиск
+  </button>
+  <button class="nav-btn" data-page="watchlist" onclick="switchPage('watchlist', this)">
+    <span class="icon">⭐</span>Вотчлист
+  </button>
+  <button class="nav-btn" data-page="portfolio" onclick="switchPage('portfolio', this)">
+    <span class="icon">💼</span>Портфель
+  </button>
+  <button class="nav-btn" data-page="chart" onclick="switchPage('chart', this)">
+    <span class="icon">📈</span>График
+  </button>
+</nav>
+
+<!-- FAB -->
+<button class="fab hidden" id="fab" onclick="openAddModal()">＋</button>
+
+<!-- Add modal (watchlist / portfolio) -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title" id="addModalTitle">Добавить в вотчлист</div>
+    <div id="addModalSearchBox">
+      <input class="modal-input" id="addModalSearch" placeholder="Поиск предмета..."
+        onkeydown="if(event.key==='Enter') doModalSearch()">
+      <div id="addModalResults"></div>
+    </div>
+    <div id="addModalForm" style="display:none">
+      <div style="font-size:14px; margin-bottom:12px; color:var(--gold)" id="addModalItemName"></div>
+      <input class="modal-input" id="addModalValue" type="number" step="0.01" min="0">
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" onclick="closeAddModal()">Отмена</button>
+        <button class="btn btn-primary" onclick="submitAdd()">Добавить</button>
+      </div>
+    </div>
+    <div id="addModalSearchButtons" class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closeAddModal()">Отмена</button>
+      <button class="btn btn-primary" onclick="doModalSearch()">🔍 Найти</button>
+    </div>
+  </div>
+</div>
+
+<!-- Currency modal -->
+<div class="modal-overlay" id="currencyModal">
+  <div class="modal">
+    <div class="modal-title">Выбрать валюту</div>
+    <div class="currency-list" id="currencyList"></div>
+    <div style="margin-top:12px">
+      <button class="btn btn-secondary" onclick="closeCurrencyModal()">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+const tg = window.Telegram.WebApp;
+tg.expand();
+tg.enableClosingConfirmation();
+
+// API base — замени на свой домен после деплоя
+const API_BASE = "https://138-2-228-123.sslip.io";
+
+let initData = tg.initData;
+let currentCurrency = "RUB";
+let currentSymbol = "руб.";
+let currentPage = "search";
+let addModalMode = "watchlist"; // or "portfolio"
+let addModalSelectedItem = null;
+let chartInstance = null;
+
+function apiUrl(path) {
+  return `${API_BASE}${path}?initData=${encodeURIComponent(initData)}`;
+}
+
+async function apiFetch(path, options = {}) {
+  const url = options.method && options.method !== "GET"
+    ? `${API_BASE}${path}?initData=${encodeURIComponent(initData)}`
+    : apiUrl(path);
+  const resp = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.detail || "Ошибка сервера");
+  }
+  return resp.json();
+}
+
+async function init() {
+  try {
+    const me = await apiFetch("/api/me");
+    currentCurrency = me.currency;
+    currentSymbol = me.currency_symbol;
+    document.getElementById("currencyBadge").textContent = currentCurrency;
+    renderCurrencyList(me.currencies);
+  } catch (e) {
+    showToast("Ошибка подключения к серверу");
+  }
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+
+function switchPage(page, btn) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("page-" + page).classList.add("active");
+  btn.classList.add("active");
+  currentPage = page;
+
+  const fab = document.getElementById("fab");
+  if (page === "watchlist" || page === "portfolio") {
+    fab.classList.remove("hidden");
+    addModalMode = page === "watchlist" ? "watchlist" : "portfolio";
+  } else {
+    fab.classList.add("hidden");
+  }
+
+  if (page === "watchlist") loadWatchlist();
+  if (page === "portfolio") loadPortfolio();
+}
+
+// ── Search page ───────────────────────────────────────────────────────────────
+
+async function doSearch() {
+  const q = document.getElementById("searchInput").value.trim();
+  if (!q) return;
+  const container = document.getElementById("searchResults");
+  container.innerHTML = `<div class="loading"><div class="spinner"></div><div>Поиск...</div></div>`;
+
+  try {
+    const data = await apiFetch(`/api/search?q=${encodeURIComponent(q)}`);
+    if (!data.results.length) {
+      const steamUrl = `https://steamcommunity.com/market/search?appid=570&q=${encodeURIComponent(q)}`;
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="emoji">😕</div>
+          <div>Ничего не найдено по «${q}»</div>
+          <div style="margin-top:10px">
+            <a href="${steamUrl}" target="_blank" style="color:var(--gold)">Поискать на Steam Market →</a>
+          </div>
+        </div>`;
+      return;
+    }
+    container.innerHTML = `<div class="section-title">Результаты поиска</div><div class="results-list">` +
+      data.results.map(name =>
+        `<div class="result-item" onclick="showItemPrice('${name.replace(/'/g,"\\'")}')">
+          <span class="result-name">${name}</span>
+          <span class="result-arrow">›</span>
+        </div>`
+      ).join("") + `</div>`;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
+  }
+}
+
+async function showItemPrice(itemName) {
+  const container = document.getElementById("searchResults");
+  container.innerHTML = `<div class="loading"><div class="spinner"></div><div>Загружаю цену...</div></div>`;
+
+  try {
+    const data = await apiFetch(`/api/price?item=${encodeURIComponent(itemName)}`);
+    container.innerHTML = `
+      <div class="price-card">
+        <div class="price-card-name">${data.item_name}</div>
+        <div class="price-row">
+          <span class="price-label">Минимальная цена</span>
+          <span class="price-value main">${fmt(data.lowest)} ${data.symbol}</span>
+        </div>
+        <div class="price-row">
+          <span class="price-label">Медианная цена</span>
+          <span class="price-value">${fmt(data.median)} ${data.symbol}</span>
+        </div>
+        ${data.volume ? `<div class="price-meta">📦 Продано за 24ч: ${data.volume}</div>` : ""}
+        <div class="price-actions">
+          <button class="btn btn-secondary" onclick="doSearch()">◀ Назад</button>
+          <button class="btn btn-secondary" onclick="addToWatchlistQuick('${itemName.replace(/'/g,"\\'")}')">⭐ Вотчлист</button>
+          <button class="btn btn-gold" onclick="addToPortfolioQuick('${itemName.replace(/'/g,"\\'")}', ${data.lowest})">💼 Портфель</button>
+        </div>
+      </div>`;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
+  }
+}
+
+// ── Watchlist ─────────────────────────────────────────────────────────────────
+
+async function loadWatchlist() {
+  const container = document.getElementById("watchlistContent");
+  container.innerHTML = `<div class="loading"><div class="spinner"></div><div>Загружаю...</div></div>`;
+  try {
+    const data = await apiFetch("/api/watchlist");
+    if (!data.items.length) {
+      container.innerHTML = `<div class="empty-state"><div class="emoji">⭐</div><div>Вотчлист пуст</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>`;
+      return;
+    }
+    container.innerHTML = data.items.map(item => {
+      const belowThreshold = item.threshold > 0 && item.current_price && item.current_price <= item.threshold;
+      return `
+        <div class="item-card">
+          <div class="item-card-header">
+            <div class="item-card-name">${item.item_name}</div>
+            <button class="item-card-delete" onclick="deleteWatchlistItem(${item.id})">×</button>
+          </div>
+          <div class="item-card-row">
+            <span class="item-card-label">Текущая цена</span>
+            <span class="item-card-value ${belowThreshold ? 'threshold-below' : ''}">
+              ${item.current_price ? fmt(item.current_price) + " " + item.symbol : "—"}
+            </span>
+          </div>
+          <div class="item-card-row">
+            <span class="item-card-label">Порог уведомления</span>
+            <span class="item-card-value">${item.threshold > 0 ? fmt(item.threshold) + " " + item.symbol : "Без порога"}</span>
+          </div>
+          ${belowThreshold ? `<div style="font-size:12px;color:var(--green);margin-top:6px">✅ Цена достигла порога!</div>` : ""}
+        </div>`;
+    }).join("");
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
+  }
+}
+
+async function deleteWatchlistItem(id) {
+  try {
+    await apiFetch(`/api/watchlist/${id}`, { method: "DELETE" });
+    showToast("Удалено из вотчлиста");
+    loadWatchlist();
+  } catch (e) { showToast(e.message); }
+}
+
+// ── Portfolio ─────────────────────────────────────────────────────────────────
+
+async function loadPortfolio() {
+  const container = document.getElementById("portfolioContent");
+  container.innerHTML = `<div class="loading"><div class="spinner"></div><div>Загружаю...</div></div>`;
+  try {
+    const data = await apiFetch("/api/portfolio");
+    if (!data.items.length) {
+      container.innerHTML = `<div class="empty-state"><div class="emoji">💼</div><div>Портфель пуст</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>`;
+      return;
+    }
+    const totalProfit = data.total_profit;
+    const profitClass = totalProfit >= 0 ? "profit-positive" : "profit-negative";
+    const profitSign = totalProfit >= 0 ? "+" : "";
+
+    let html = `
+      <div class="portfolio-summary">
+        <div class="summary-block">
+          <div class="summary-label">Вложено</div>
+          <div class="summary-value">${fmt(data.total_buy)} ${data.symbol}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">Сейчас</div>
+          <div class="summary-value">${data.total_now ? fmt(data.total_now) + " " + data.symbol : "—"}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">Прибыль</div>
+          <div class="summary-value ${profitClass}">${totalProfit != null ? profitSign + fmt(totalProfit) + " " + data.symbol : "—"}</div>
+        </div>
+      </div>`;
+
+    html += data.items.map(item => {
+      const profitClass = item.profit >= 0 ? "profit-positive" : "profit-negative";
+      const sign = item.profit >= 0 ? "+" : "";
+      return `
+        <div class="item-card">
+          <div class="item-card-header">
+            <div class="item-card-name">${item.item_name}</div>
+            <button class="item-card-delete" onclick="deletePortfolioItem(${item.id})">×</button>
+          </div>
+          <div class="item-card-row">
+            <span class="item-card-label">Куплено за</span>
+            <span class="item-card-value">${fmt(item.buy_price)} ${item.symbol}</span>
+          </div>
+          <div class="item-card-row">
+            <span class="item-card-label">Сейчас</span>
+            <span class="item-card-value">${item.current_price ? fmt(item.current_price) + " " + item.symbol : "—"}</span>
+          </div>
+          ${item.profit != null ? `
+          <div class="item-card-row">
+            <span class="item-card-label">Прибыль</span>
+            <span class="item-card-value ${profitClass}">${sign}${fmt(item.profit)} ${item.symbol} (${sign}${item.profit_pct.toFixed(1)}%)</span>
+          </div>` : ""}
+        </div>`;
+    }).join("");
+
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
+  }
+}
+
+async function deletePortfolioItem(id) {
+  try {
+    await apiFetch(`/api/portfolio/${id}`, { method: "DELETE" });
+    showToast("Удалено из портфеля");
+    loadPortfolio();
+  } catch (e) { showToast(e.message); }
+}
+
+// ── Chart page ────────────────────────────────────────────────────────────────
+
+async function doChartSearch() {
+  const q = document.getElementById("chartSearchInput").value.trim();
+  if (!q) return;
+  const container = document.getElementById("chartSearchResults");
+  container.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
+  try {
+    const data = await apiFetch(`/api/search?q=${encodeURIComponent(q)}`);
+    if (!data.results.length) {
+      container.innerHTML = `<div class="empty-state"><div>Ничего не найдено</div></div>`;
+      return;
+    }
+    container.innerHTML = `<div class="results-list" style="margin-bottom:12px">` +
+      data.results.map(name =>
+        `<div class="result-item" onclick="loadChart('${name.replace(/'/g,"\\'")}')">
+          <span class="result-name">${name}</span><span class="result-arrow">›</span>
+        </div>`
+      ).join("") + `</div>`;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><div>${e.message}</div></div>`;
+  }
+}
+
+async function loadChart(itemName) {
+  document.getElementById("chartSearchResults").innerHTML = "";
+  const container = document.getElementById("chartContainer");
+  container.style.display = "block";
+  document.getElementById("chartTitle").textContent = itemName;
+
+  try {
+    const data = await apiFetch(`/api/history?item=${encodeURIComponent(itemName)}`);
+    if (!data.history.length) {
+      container.innerHTML = `<div class="empty-state"><div class="emoji">📈</div><div>История пока пуста</div><div style="font-size:12px;margin-top:6px">Данные накапливаются при каждом запросе цены</div></div>`;
+      return;
+    }
+
+    const labels = data.history.map(h => {
+      const d = new Date(h.date);
+      return `${d.getDate()}.${String(d.getMonth()+1).padStart(2,"0")}`;
+    });
+    const prices = data.history.map(h => h.price);
+
+    if (chartInstance) chartInstance.destroy();
+
+    const ctx = document.getElementById("priceChart").getContext("2d");
+    chartInstance = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: "Цена",
+          data: prices,
+          borderColor: "#c89b3c",
+          backgroundColor: "rgba(200,155,60,0.1)",
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: "#c89b3c",
+          fill: true,
+          tension: 0.3,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#888899", font: { size: 11 } }, grid: { color: "#2a2a3e" } },
+          y: { ticks: { color: "#888899", font: { size: 11 } }, grid: { color: "#2a2a3e" } }
+        }
+      }
+    });
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><div>${e.message}</div></div>`;
+  }
+}
+
+// ── Add modal ─────────────────────────────────────────────────────────────────
+
+function openAddModal() {
+  addModalSelectedItem = null;
+  document.getElementById("addModalTitle").textContent =
+    addModalMode === "watchlist" ? "Добавить в вотчлист" : "Добавить в портфель";
+  document.getElementById("addModalValue").placeholder =
+    addModalMode === "watchlist" ? "Порог цены (0 = без порога)" : "Цена покупки";
+  document.getElementById("addModalSearch").value = "";
+  document.getElementById("addModalResults").innerHTML = "";
+  document.getElementById("addModalSearchBox").style.display = "block";
+  document.getElementById("addModalForm").style.display = "none";
+  document.getElementById("addModalSearchButtons").style.display = "flex";
+  document.getElementById("addModal").classList.add("open");
+  setTimeout(() => document.getElementById("addModalSearch").focus(), 100);
+}
+
+function closeAddModal() {
+  document.getElementById("addModal").classList.remove("open");
+}
+
+async function doModalSearch() {
+  const q = document.getElementById("addModalSearch").value.trim();
+  if (!q) return;
+  const container = document.getElementById("addModalResults");
+  container.innerHTML = `<div class="loading" style="padding:10px"><div class="spinner" style="width:16px;height:16px;margin:0 auto 4px"></div></div>`;
+  try {
+    const data = await apiFetch(`/api/search?q=${encodeURIComponent(q)}`);
+    if (!data.results.length) {
+      container.innerHTML = `<div style="color:var(--text-dim);font-size:13px;padding:8px 0">Ничего не найдено</div>`;
+      return;
+    }
+    container.innerHTML = `<div class="results-list" style="margin-top:8px;max-height:200px;overflow-y:auto">` +
+      data.results.map(name =>
+        `<div class="result-item" onclick="selectModalItem('${name.replace(/'/g,"\\'")}')">
+          <span class="result-name" style="font-size:13px">${name}</span>
+        </div>`
+      ).join("") + `</div>`;
+  } catch (e) {
+    container.innerHTML = `<div style="color:var(--red);font-size:13px">${e.message}</div>`;
+  }
+}
+
+function selectModalItem(itemName) {
+  addModalSelectedItem = itemName;
+  document.getElementById("addModalSearchBox").style.display = "none";
+  document.getElementById("addModalSearchButtons").style.display = "none";
+  document.getElementById("addModalItemName").textContent = itemName;
+  document.getElementById("addModalValue").value = "";
+  document.getElementById("addModalForm").style.display = "block";
+  setTimeout(() => document.getElementById("addModalValue").focus(), 100);
+}
+
+async function submitAdd() {
+  if (!addModalSelectedItem) return;
+  const val = parseFloat(document.getElementById("addModalValue").value) || 0;
+
+  try {
+    if (addModalMode === "watchlist") {
+      await apiFetch("/api/watchlist", {
+        method: "POST",
+        body: JSON.stringify({ item_name: addModalSelectedItem, threshold: val }),
+      });
+      showToast("Добавлено в вотчлист ⭐");
+      closeAddModal();
+      loadWatchlist();
+    } else {
+      if (val <= 0) { showToast("Введи цену покупки"); return; }
+      await apiFetch("/api/portfolio", {
+        method: "POST",
+        body: JSON.stringify({ item_name: addModalSelectedItem, buy_price: val }),
+      });
+      showToast("Добавлено в портфель 💼");
+      closeAddModal();
+      loadPortfolio();
+    }
+  } catch (e) { showToast(e.message); }
+}
+
+function addToWatchlistQuick(itemName) {
+  addModalMode = "watchlist";
+  selectModalItem(itemName);
+  document.getElementById("addModalTitle").textContent = "Добавить в вотчлист";
+  document.getElementById("addModalValue").placeholder = "Порог цены (0 = без порога)";
+  document.getElementById("addModal").classList.add("open");
+}
+
+function addToPortfolioQuick(itemName, price) {
+  addModalMode = "portfolio";
+  selectModalItem(itemName);
+  document.getElementById("addModalTitle").textContent = "Добавить в портфель";
+  document.getElementById("addModalValue").placeholder = "Цена покупки";
+  document.getElementById("addModalValue").value = price;
+  document.getElementById("addModal").classList.add("open");
+}
+
+// ── Currency ──────────────────────────────────────────────────────────────────
+
+function renderCurrencyList(currencies) {
+  const list = document.getElementById("currencyList");
+  list.innerHTML = currencies.map(c => `
+    <div class="currency-option ${c.code === currentCurrency ? "selected" : ""}"
+      onclick="selectCurrency('${c.code}', '${c.symbol}', this)">
+      <span class="currency-option-name">${c.name}</span>
+      <span>
+        <span class="currency-option-sym">${c.symbol}</span>
+        ${c.code === currentCurrency ? '<span class="currency-check">✓</span>' : ''}
+      </span>
+    </div>`).join("");
+}
+
+async function selectCurrency(code, symbol, el) {
+  try {
+    await apiFetch("/api/settings/currency", {
+      method: "POST",
+      body: JSON.stringify({ currency: code }),
+    });
+    currentCurrency = code;
+    currentSymbol = symbol;
+    document.getElementById("currencyBadge").textContent = code;
+    document.querySelectorAll(".currency-option").forEach(o => {
+      o.classList.remove("selected");
+      o.querySelector(".currency-check")?.remove();
+    });
+    el.classList.add("selected");
+    closeCurrencyModal();
+    showToast(`Валюта: ${code}`);
+  } catch (e) { showToast(e.message); }
+}
+
+function openCurrencyModal() { document.getElementById("currencyModal").classList.add("open"); }
+function closeCurrencyModal() { document.getElementById("currencyModal").classList.remove("open"); }
+
+// Закрытие модалок по клику на overlay
+document.getElementById("addModal").addEventListener("click", function(e) {
+  if (e.target === this) closeAddModal();
+});
+document.getElementById("currencyModal").addEventListener("click", function(e) {
+  if (e.target === this) closeCurrencyModal();
+});
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+
+function fmt(n) {
+  if (n == null) return "—";
+  return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
