@@ -1,0 +1,14 @@
+[Unit]
+Description=Ngrok tunnel for Dota 2 API
+After=network.target dota2api.service
+
+[Service]
+User=ubuntu
+ExecStart=/usr/local/bin/ngrok http --domain=exclusive-consoling-heavily.ngrok-free.dev 8000
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
