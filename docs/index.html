@@ -6,8 +6,8 @@
 <title>Dota 2 Price Tracker</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<!-- Adsgram SDK — замени blockId на свой из личного кабинета adsgram.ai -->
-<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<!-- Adsgram SDK — загружаем асинхронно чтобы не блокировать страницу -->
+<script async src="https://sad.adsgram.ai/js/sad.min.js"></script>
 <style>
   :root {
     --bg:       #0d0d14;
@@ -643,17 +643,13 @@ async function init() {
       showToast(`⚠️ Осталось ${me.checks_left}/${me.checks_limit} проверок на этой неделе`);
     }
 
-    // Инициализируем Adsgram если не премиум
-    if (!userIsPremium && ADSGRAM_BLOCK_ID !== "YOUR_BLOCK_ID_HERE") {
-      try {
-        adController = await window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
-      } catch(e) {
-        console.warn("Adsgram init failed:", e);
-      }
-    }
-
     loadTopItems();
     loadExpensiveItems();
+
+    // Adsgram инициализируем отдельно после загрузки страницы (не блокируем UI)
+    if (!userIsPremium && ADSGRAM_BLOCK_ID !== "YOUR_BLOCK_ID_HERE") {
+      setTimeout(initAdsgram, 3000);
+    }
   } catch (e) {
     showToast("❌ " + (e.message || "Ошибка подключения"));
   }
@@ -1095,4 +1091,5 @@ function selectModalItem(itemName) {
     document.getElementById("addModalValueHigh").value = "";
     document.getElementById("addModalHint").textContent =
       "Оба порога необязательны. Оставь 0 если не нужно уведомление для этого направления.";
-  } els
+  } else {
+    document.getElementById("addModalWatchlistF

@@ -17,6 +17,7 @@ from typing import Optional
 
 from config import BOT_TOKEN
 from database import (
+    init_db,
     get_user_settings,
     set_user_currency,
     is_premium,
@@ -69,6 +70,10 @@ EXPENSIVE_ITEMS = [
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Dota2 Price API", version="1.0.0")
+
+@app.on_event("startup")
+def on_startup():
+    init_db()  # запускаем миграции при старте API
 
 app.add_middleware(
     CORSMiddleware,
