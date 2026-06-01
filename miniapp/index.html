@@ -449,7 +449,8 @@ async function init() {
     document.getElementById("currencyBadge").textContent = currentCurrency;
     renderCurrencyList(me.currencies);
   } catch (e) {
-    showToast("Ошибка подключения к серверу");
+    showToast("❌ " + (e.message || "Ошибка подключения к серверу"));
+    console.error("init error:", e);
   }
 }
 

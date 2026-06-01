@@ -70,9 +70,9 @@ def validate_init_data(init_data: str) -> dict:
         if not hmac.compare_digest(expected_hash, hash_value):
             raise HTTPException(status_code=401, detail="Invalid initData signature")
 
-        # Проверяем свежесть (не старше 1 часа)
+        # Проверяем свежесть (не старше 24 часов)
         auth_date = int(parsed.get("auth_date", ["0"])[0])
-        if time.time() - auth_date > 3600:
+        if time.time() - auth_date > 86400:
             raise HTTPException(status_code=401, detail="initData expired")
 
         user_raw = parsed.get("user", ["{}"])[0]
