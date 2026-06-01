@@ -406,8 +406,8 @@
     </div>
   </div>
 
-  <!-- DMarket баннер (реферальная ссылка — замени REFCODE на свой код партнёра) -->
-  <a class="dmarket-banner" href="https://dmarket.com/ingame-items/item-list/dota2-skins?ref=REFCODE&utm_source=tgbot&utm_medium=banner" target="_blank">
+  <!-- Баннер маркетплейса -->
+  <a class="dmarket-banner" href="https://dmarket.com/ingame-items/item-list/dota2-skins" target="_blank">
     <span class="dmarket-logo">💎</span>
     <div class="dmarket-text">
       <div class="dmarket-title">Торгуй на DMarket</div>
@@ -1124,4 +1124,7 @@ function renderCurrencyList(currencies) {
   list.innerHTML = currencies.map(c => `
     <div class="currency-option ${c.code === currentCurrency ? "selected" : ""}"
       onclick="selectCurrency('${c.code}', '${c.symbol}', this)">
-      <span class="currency-option-na
+      <span class="currency-option-name">${c.name}</span>
+      <span>
+        <span class="currency-option-sym">${c.symbol}</span>
+        ${c.code === currentCurrency
