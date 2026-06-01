@@ -420,7 +420,8 @@ let addModalSelectedItem = null;
 let chartInstance = null;
 
 function apiUrl(path) {
-  return `${API_BASE}${path}?initData=${encodeURIComponent(initData)}`;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${API_BASE}${path}${sep}initData=${encodeURIComponent(initData)}`;
 }
 
 async function apiFetch(path, options = {}) {
@@ -436,7 +437,11 @@ async function apiFetch(path, options = {}) {
   });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    throw new Error(err.detail || "Ошибка сервера");
+    const detail = err.detail;
+    const msg = typeof detail === "string" ? detail
+               : Array.isArray(detail) ? detail.map(d => d.msg).join(", ")
+               : `Ошибка ${resp.status}`;
+    throw new Error(msg);
   }
   return resp.json();
 }
