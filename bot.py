@@ -65,6 +65,7 @@ SETTINGS_CHOOSE = 20
 
 # Замени на свой URL после деплоя на Vercel
 MINIAPP_URL = "https://miniapp-9re1s4tp3-mikpavlik-9526s-projects.vercel.app"
+MINIAPP_LINK = "https://t.me/Dota2PriceBot/prices"
 
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
