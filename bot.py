@@ -448,10 +448,11 @@ async def share_referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"👥 <b>Реферальная программа</b>\n\n"
         f"Приглашай друзей и получай <b>+3 сравнения</b> Steam vs DMarket за каждого!\n\n"
-        f"Твоя ссылка:\n<code>{ref_link}</code>\n\n"
-        f"Приглашено друзей: <b>{count}</b>",
+        f"Приглашено друзей: <b>{count}</b>\n\n"
+        f"Твоя ссылка 👇 (нажми чтобы скопировать)",
         parse_mode="HTML",
     )
+    await update.message.reply_text(ref_link)
 
 
 # ── Общий обработчик неизвестных сообщений ────────────────────────────────────
