@@ -163,9 +163,10 @@ NOTIFY_COOLDOWN_HOURS = 24  # не слать уведомление чаще р
 async def check_watchlist(context):
     """
     Вызывается APScheduler каждые 30 минут.
-    Проверяет все записи вотчлиста и отправляет уведомление
-    если цена упала до порога или ниже.
-    Повторное уведомление по одному предмету — не чаще раза в 24 часа.
+    Проверяет все записи вотчлиста и отправляет уведомление:
+    - если цена упала до порога или ниже (threshold)
+    - если цена выросла до порога или выше (threshold_high)
+    Повторное уведомление — не чаще раза в 24 часа.
     """
     from datetime import datetime, timedelta
     from database import get_all_watchlist_items, get_user_settings, update_watchlist_notified
@@ -175,43 +176,67 @@ async def check_watchlist(context):
     for entry in items:
         user_id = entry["user_id"]
         item_name = entry["item_name"]
-        threshold = entry["threshold"]
+        threshold_low = entry.get("threshold") or 0
+        threshold_high = entry.get("threshold_high") or 0
 
-        # Пропускаем если порог не задан
-        if not threshold or threshold <= 0:
+        # Пропускаем если оба порога не заданы
+        if threshold_low <= 0 and threshold_high <= 0:
             continue
-
-        # Проверяем cooldown — не уведомляли ли уже недавно
-        last_notified = entry.get("last_notified")
-        if last_notified:
-            try:
-                last_dt = datetime.fromisoformat(last_notified)
-                if datetime.utcnow() - last_dt < timedelta(hours=NOTIFY_COOLDOWN_HOURS):
-                    continue  # ещё не прошло 24 часа
-            except ValueError:
-                pass
 
         settings = get_user_settings(user_id)
         currency = settings.get("currency", "RUB")
-
         price_data = get_item_price(item_name, currency)
         if not price_data:
             continue
 
         lowest = price_data["lowest"]
-        if lowest <= threshold:
-            sym = price_data["symbol"]
-            text = (
-                f"🔔 <b>Уведомление вотчлиста</b>\n\n"
-                f"🎮 {item_name}\n"
-                f"💰 Цена упала до <b>{lowest:,.2f} {sym}</b>\n"
-                f"🎯 Твой порог: {threshold:,.2f} {sym}"
-            )
-            try:
-                await context.bot.send_message(
-                    chat_id=user_id, text=text, parse_mode="HTML"
+        sym = price_data["symbol"]
+        now = datetime.utcnow()
+
+        # ── Уведомление о снижении цены ──────────────────────────────────────
+        if threshold_low > 0 and lowest <= threshold_low:
+            last_notified = entry.get("last_notified")
+            can_notify = True
+            if last_notified:
+                try:
+                    if now - datetime.fromisoformat(last_notified) < timedelta(hours=NOTIFY_COOLDOWN_HOURS):
+                        can_notify = False
+                except ValueError:
+                    pass
+            if can_notify:
+                text = (
+                    f"📉 <b>Цена снизилась!</b>\n\n"
+                    f"🎮 {item_name}\n"
+                    f"💰 Цена: <b>{lowest:,.2f} {sym}</b>\n"
+                    f"🎯 Твой порог снижения: {threshold_low:,.2f} {sym}"
                 )
-                update_watchlist_notified(entry["id"])
-                logger.info("Watchlist alert sent: user=%s item=%s", user_id, item_name)
-            except Exception as e:
-                logger.warning("Failed to notify user %s: %s", user_id, e)
+                try:
+                    await context.bot.send_message(chat_id=user_id, text=text, parse_mode="HTML")
+                    update_watchlist_notified(entry["id"], high=False)
+                    logger.info("Drop alert sent: user=%s item=%s price=%s", user_id, item_name, lowest)
+                except Exception as e:
+                    logger.warning("Failed to notify user %s: %s", user_id, e)
+
+        # ── Уведомление о росте цены ─────────────────────────────────────────
+        if threshold_high > 0 and lowest >= threshold_high:
+            last_notified_high = entry.get("last_notified_high")
+            can_notify = True
+            if last_notified_high:
+                try:
+                    if now - datetime.fromisoformat(last_notified_high) < timedelta(hours=NOTIFY_COOLDOWN_HOURS):
+                        can_notify = False
+                except ValueError:
+                    pass
+            if can_notify:
+                text = (
+                    f"📈 <b>Цена выросла!</b>\n\n"
+                    f"🎮 {item_name}\n"
+                    f"💰 Цена: <b>{lowest:,.2f} {sym}</b>\n"
+                    f"🎯 Твой порог роста: {threshold_high:,.2f} {sym}"
+                )
+                try:
+                    await context.bot.send_message(chat_id=user_id, text=text, parse_mode="HTML")
+                    update_watchlist_notified(entry["id"], high=True)
+                    logger.info("Rise alert sent: user=%s item=%s price=%s", user_id, item_name, lowest)
+                except Exception as e:
+                    logger.warning("Failed to notify user %s: %s", user_id, e)

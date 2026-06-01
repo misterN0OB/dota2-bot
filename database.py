@@ -3,6 +3,12 @@ from datetime import datetime, timedelta
 
 DB_PATH = "dota2bot.db"
 
+FREE_WATCHLIST_LIMIT = 7          # базовых слотов вотчлиста
+MAX_WATCHLIST_WITH_ADS = 10       # максимум с бонусами за рекламу
+FREE_WEEKLY_PRICE_CHECKS = 15     # проверок цены в неделю
+AD_REWARD_PRICE_CHECKS = 3        # проверок за просмотр рекламы
+AD_REWARD_WATCHLIST = 1           # слот вотчлиста за рекламу
+
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH)
@@ -20,15 +26,18 @@ def init_db():
                 compare_count INTEGER DEFAULT 0,
                 week_start TEXT DEFAULT '',
                 bonus_compares INTEGER DEFAULT 0,
-                bonus_watchlist INTEGER DEFAULT 0
+                bonus_watchlist INTEGER DEFAULT 0,
+                bonus_price_checks INTEGER DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS watchlist (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
                 item_name TEXT,
-                threshold REAL,
-                last_notified TEXT DEFAULT NULL
+                threshold REAL DEFAULT 0,
+                threshold_high REAL DEFAULT NULL,
+                last_notified TEXT DEFAULT NULL,
+                last_notified_high TEXT DEFAULT NULL
             );
 
             CREATE TABLE IF NOT EXISTS user_activity (
@@ -67,7 +76,10 @@ def init_db():
         # Миграции: добавляем колонки если их ещё нет
         for migration in [
             "ALTER TABLE watchlist ADD COLUMN last_notified TEXT DEFAULT NULL",
+            "ALTER TABLE watchlist ADD COLUMN threshold_high REAL DEFAULT NULL",
+            "ALTER TABLE watchlist ADD COLUMN last_notified_high TEXT DEFAULT NULL",
             "ALTER TABLE user_settings ADD COLUMN bonus_watchlist INTEGER DEFAULT 0",
+            "ALTER TABLE user_settings ADD COLUMN bonus_price_checks INTEGER DEFAULT 0",
         ]:
             try:
                 conn.execute(migration)
@@ -84,12 +96,14 @@ def get_user_settings(user_id: int) -> dict:
         ).fetchone()
         if row:
             return dict(row)
-        # Создаём запись при первом обращении
         conn.execute(
             "INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)", (user_id,)
         )
-        return {"user_id": user_id, "currency": "RUB", "premium": 0,
-                "compare_count": 0, "week_start": "", "bonus_compares": 0, "bonus_watchlist": 0}
+        return {
+            "user_id": user_id, "currency": "RUB", "premium": 0,
+            "compare_count": 0, "week_start": "", "bonus_compares": 0,
+            "bonus_watchlist": 0, "bonus_price_checks": 0,
+        }
 
 
 def set_user_currency(user_id: int, currency: str):
@@ -116,12 +130,9 @@ def set_premium(user_id: int, value: bool = True):
 
 
 def get_compares_left(user_id: int, free_per_week: int) -> int:
-    """Возвращает оставшееся количество сравнений на этой неделе."""
     settings = get_user_settings(user_id)
     now = datetime.utcnow()
     week_start_str = settings.get("week_start", "")
-
-    # Сбросить счётчик если прошла неделя
     if week_start_str:
         try:
             week_start = datetime.fromisoformat(week_start_str)
@@ -129,7 +140,6 @@ def get_compares_left(user_id: int, free_per_week: int) -> int:
                 week_start_str = ""
         except ValueError:
             week_start_str = ""
-
     if not week_start_str:
         with get_conn() as conn:
             conn.execute("""
@@ -140,8 +150,6 @@ def get_compares_left(user_id: int, free_per_week: int) -> int:
                         compare_count = 0
             """, (user_id, now.isoformat()))
         settings["compare_count"] = 0
-        settings["bonus_compares"] = settings.get("bonus_compares", 0)
-
     bonus = settings.get("bonus_compares", 0)
     used = settings.get("compare_count", 0)
     return max(0, free_per_week + bonus - used)
@@ -159,7 +167,8 @@ def use_compare(user_id: int):
 
 # ── watchlist ──────────────────────────────────────────────────────────────────
 
-def add_to_watchlist(user_id: int, item_name: str, threshold: float) -> bool:
+def add_to_watchlist(user_id: int, item_name: str,
+                     threshold: float = 0.0, threshold_high: float = 0.0) -> bool:
     """Добавляет предмет в вотчлист. Возвращает False если уже есть."""
     with get_conn() as conn:
         existing = conn.execute(
@@ -168,9 +177,10 @@ def add_to_watchlist(user_id: int, item_name: str, threshold: float) -> bool:
         ).fetchone()
         if existing:
             return False
+        thr_high = threshold_high if threshold_high and threshold_high > 0 else None
         conn.execute(
-            "INSERT INTO watchlist (user_id, item_name, threshold) VALUES (?, ?, ?)",
-            (user_id, item_name, threshold)
+            "INSERT INTO watchlist (user_id, item_name, threshold, threshold_high) VALUES (?, ?, ?, ?)",
+            (user_id, item_name, threshold, thr_high)
         )
         return True
 
@@ -194,26 +204,27 @@ def remove_from_watchlist(watchlist_id: int, user_id: int) -> bool:
 
 
 def get_all_watchlist_items() -> list[dict]:
-    """Все записи вотчлиста для фоновой проверки."""
     with get_conn() as conn:
         rows = conn.execute("SELECT * FROM watchlist").fetchall()
         return [dict(r) for r in rows]
 
 
-def update_watchlist_notified(watchlist_id: int):
-    """Обновляет время последнего уведомления для предмета в вотчлисте."""
+def update_watchlist_notified(watchlist_id: int, high: bool = False):
+    col = "last_notified_high" if high else "last_notified"
     with get_conn() as conn:
         conn.execute(
-            "UPDATE watchlist SET last_notified = datetime('now') WHERE id = ?",
+            f"UPDATE watchlist SET {col} = datetime('now') WHERE id = ?",
             (watchlist_id,)
         )
 
 
-def update_watchlist_threshold(watchlist_id: int, user_id: int, threshold: float):
+def update_watchlist_threshold(watchlist_id: int, user_id: int,
+                                threshold: float, threshold_high: float = 0.0):
+    thr_high = threshold_high if threshold_high and threshold_high > 0 else None
     with get_conn() as conn:
         conn.execute(
-            "UPDATE watchlist SET threshold = ? WHERE id = ? AND user_id = ?",
-            (threshold, watchlist_id, user_id)
+            "UPDATE watchlist SET threshold = ?, threshold_high = ? WHERE id = ? AND user_id = ?",
+            (threshold, thr_high, watchlist_id, user_id)
         )
 
 
@@ -240,7 +251,6 @@ def get_price_history(item_name: str, limit: int = 10) -> list[dict]:
 # ── referrals ──────────────────────────────────────────────────────────────────
 
 def add_referral(referrer_id: int, referred_id: int) -> bool:
-    """Регистрирует реферала. Возвращает False если referred_id уже зарегистрирован."""
     with get_conn() as conn:
         try:
             conn.execute(
@@ -252,8 +262,9 @@ def add_referral(referrer_id: int, referred_id: int) -> bool:
                 INSERT INTO user_settings (user_id, bonus_watchlist)
                 VALUES (?, 3)
                 ON CONFLICT(user_id) DO UPDATE
-                    SET bonus_watchlist = bonus_watchlist + 3
-            """, (referrer_id,))
+                    SET bonus_watchlist = MIN(bonus_watchlist + 3,
+                        ? - ?)
+            """, (referrer_id, MAX_WATCHLIST_WITH_ADS, FREE_WATCHLIST_LIMIT))
             return True
         except sqlite3.IntegrityError:
             return False
@@ -326,25 +337,58 @@ def get_event_count(event_type: str, since_hours: int = 24) -> int:
         return row["cnt"] if row else 0
 
 
-# ── price check rate-limit ─────────────────────────────────────────────────────
+# ── price check rate-limit (weekly) ───────────────────────────────────────────
 
-def get_price_checks_today(user_id: int) -> int:
-    """Количество проверок цены пользователем за сегодня (UTC)."""
+def get_price_checks_this_week(user_id: int) -> int:
+    """Количество проверок цены за последние 7 дней."""
     with get_conn() as conn:
         row = conn.execute(
             "SELECT COUNT(*) as cnt FROM daily_events "
-            "WHERE event_type = ? AND created_at >= date('now')",
+            "WHERE event_type = ? AND created_at >= datetime('now', '-7 days')",
             (f"pc_{user_id}",)
         ).fetchone()
         return row["cnt"] if row else 0
 
 
 def log_user_price_check(user_id: int):
-    """Фиксирует проверку цены для пользователя."""
     log_event(f"pc_{user_id}")
 
 
+# ── ad rewards ────────────────────────────────────────────────────────────────
+
+def get_bonus_price_checks(user_id: int) -> int:
+    settings = get_user_settings(user_id)
+    return settings.get("bonus_price_checks", 0)
+
+
+def add_bonus_price_checks(user_id: int, count: int = AD_REWARD_PRICE_CHECKS):
+    """Добавляет бонусные проверки цены (за просмотр рекламы)."""
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO user_settings (user_id, bonus_price_checks)
+            VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE
+                SET bonus_price_checks = bonus_price_checks + ?
+        """, (user_id, count, count))
+
+
+def add_bonus_watchlist_slot(user_id: int) -> bool:
+    """Добавляет +1 слот в вотчлист за рекламу. Возвращает False если достигнут лимит."""
+    settings = get_user_settings(user_id)
+    current_bonus = settings.get("bonus_watchlist", 0)
+    max_bonus = MAX_WATCHLIST_WITH_ADS - FREE_WATCHLIST_LIMIT  # = 3
+    if current_bonus >= max_bonus:
+        return False
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO user_settings (user_id, bonus_watchlist)
+            VALUES (?, 1)
+            ON CONFLICT(user_id) DO UPDATE
+                SET bonus_watchlist = MIN(bonus_watchlist + 1, ?)
+        """, (user_id, max_bonus))
+    return True
+
+
 def get_bonus_watchlist(user_id: int) -> int:
-    """Возвращает количество бонусных слотов вотчлиста (за рефералов)."""
     settings = get_user_settings(user_id)
     return settings.get("bonus_watchlist", 0)

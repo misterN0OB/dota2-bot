@@ -6,6 +6,8 @@
 <title>Dota 2 Price Tracker</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- Adsgram SDK — замени blockId на свой из личного кабинета adsgram.ai -->
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 <style>
   :root {
     --bg:       #0d0d14;
@@ -496,7 +498,15 @@
     </div>
     <div id="addModalForm" style="display:none">
       <div style="font-size:14px; margin-bottom:10px; color:var(--gold); font-weight:600" id="addModalItemName"></div>
-      <input class="modal-input" id="addModalValue" type="number" step="0.01" min="0">
+      <div id="addModalWatchlistFields">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">📉 Порог снижения (уведомление когда цена упадёт до)</div>
+        <input class="modal-input" id="addModalValueLow" type="number" step="0.01" min="0" placeholder="Например: 500 (или 0 — без уведомления)">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;margin-top:4px">📈 Порог роста (уведомление когда цена вырастет до)</div>
+        <input class="modal-input" id="addModalValueHigh" type="number" step="0.01" min="0" placeholder="Например: 2000 (или 0 — без уведомления)">
+      </div>
+      <div id="addModalPortfolioField" style="display:none">
+        <input class="modal-input" id="addModalValue" type="number" step="0.01" min="0">
+      </div>
       <div class="modal-hint" id="addModalHint"></div>
       <div class="modal-buttons">
         <button class="btn btn-secondary" onclick="closeAddModal()">Отмена</button>
@@ -527,16 +537,37 @@
     <div class="stars-icon">⭐</div>
     <div class="premium-title">Dota 2 Tracker Premium</div>
     <div class="premium-features">
+      <div class="premium-feature"><span class="feat-icon">🔍</span> Безлимитные проверки цены</div>
       <div class="premium-feature"><span class="feat-icon">♾️</span> Безлимитный вотчлист</div>
       <div class="premium-feature"><span class="feat-icon">💼</span> Безлимитный портфель</div>
       <div class="premium-feature"><span class="feat-icon">🚫</span> Без рекламы</div>
-      <div class="premium-feature"><span class="feat-icon">⚡</span> Приоритетная поддержка</div>
+      <div class="premium-feature"><span class="feat-icon">📈</span> Уведомления о росте и снижении</div>
     </div>
     <div class="premium-price">200 ⭐</div>
     <div class="premium-price-sub">Telegram Stars · Разовая оплата</div>
     <div class="modal-buttons">
       <button class="btn btn-secondary" onclick="closePremiumModal()">Закрыть</button>
       <button class="btn btn-stars" onclick="buyPremium()">⭐ Купить Premium</button>
+    </div>
+  </div>
+</div>
+
+<!-- Limit modal (price checks exhausted) -->
+<div class="modal-overlay" id="limitModal">
+  <div class="modal" style="text-align:center">
+    <div style="font-size:48px;margin-bottom:10px">🔒</div>
+    <div class="modal-title" style="text-align:center">Лимит исчерпан</div>
+    <div class="modal-hint" id="limitModalText" style="margin-bottom:20px;font-size:14px;line-height:1.6"></div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn" id="watchAdBtn"
+        style="background:linear-gradient(135deg,#2d6a4f,#40916c);color:#fff;font-size:15px;padding:14px"
+        onclick="watchAdForReward('price_checks')">
+        📺 Смотреть рекламу (+3 проверки)
+      </button>
+      <button class="btn btn-stars" style="font-size:14px;padding:12px" onclick="closeLimitModal();openPremiumModal()">
+        ⭐ Оформить Premium — безлимит
+      </button>
+      <button class="btn btn-secondary" onclick="closeLimitModal()">Закрыть</button>
     </div>
   </div>
 </div>
@@ -551,6 +582,8 @@ const tg = window.Telegram.WebApp;
 tg.expand();
 
 const API_BASE = "https://exclusive-consoling-heavily.ngrok-free.dev";
+// ⬇ Замени на свой blockId из личного кабинета adsgram.ai
+const ADSGRAM_BLOCK_ID = "YOUR_BLOCK_ID_HERE";
 
 let initData = tg.initData;
 let currentCurrency = "RUB";
@@ -560,6 +593,7 @@ let addModalMode = "watchlist";
 let addModalSelectedItem = null;
 let chartInstance = null;
 let userIsPremium = false;
+let adController = null;
 
 function apiUrl(path) {
   const sep = path.includes("?") ? "&" : "?";
@@ -596,22 +630,25 @@ async function init() {
     document.getElementById("currencyBadge").textContent = currentCurrency;
     renderCurrencyList(me.currencies);
 
-    // Сохраняем данные из /api/me
+    // Сохраняем данные из /api/me (включает premium, лимиты)
     window._meData = me;
+    userIsPremium = me.premium || false;
 
-    // Проверяем премиум
-    const prem = await apiFetch("/api/premium");
-    userIsPremium = prem.premium;
     if (userIsPremium) {
       document.getElementById("premiumBadge").classList.add("show");
     }
 
     // Показываем счётчик проверок цены если не премиум
-    if (!userIsPremium && me.price_checks_left != null) {
-      const left = me.price_checks_left;
-      const limit = me.price_checks_limit;
-      if (left <= 5) {
-        showToast(`⚠️ Осталось ${left}/${limit} проверок цены сегодня`);
+    if (!userIsPremium && me.checks_left != null && me.checks_left <= 5) {
+      showToast(`⚠️ Осталось ${me.checks_left}/${me.checks_limit} проверок на этой неделе`);
+    }
+
+    // Инициализируем Adsgram если не премиум
+    if (!userIsPremium && ADSGRAM_BLOCK_ID !== "YOUR_BLOCK_ID_HERE") {
+      try {
+        adController = await window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
+      } catch(e) {
+        console.warn("Adsgram init failed:", e);
       }
     }
 
@@ -738,14 +775,14 @@ async function showItemPrice(itemName) {
 
   try {
     const data = await apiFetch(`/api/price?item=${encodeURIComponent(itemName)}`);
-    // Обновляем счётчик проверок в памяти
-    if (window._meData && window._meData.price_checks_left != null) {
-      window._meData.price_checks_left = Math.max(0, window._meData.price_checks_left - 1);
-      window._meData.price_checks_today = (window._meData.price_checks_today || 0) + 1;
+    // Обновляем счётчик в памяти из ответа API
+    if (data.checks_left != null && window._meData) {
+      window._meData.checks_left = data.checks_left;
+      window._meData.checks_limit = data.checks_limit;
     }
-    const checksLeft = window._meData && window._meData.price_checks_left;
-    const checksHtml = (!userIsPremium && checksLeft != null)
-      ? `<div class="price-meta" style="margin-top:8px">🔍 Осталось проверок сегодня: <b>${checksLeft}</b> · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">∞ PRO</span></div>`
+    const checksLeft = !userIsPremium && data.checks_left != null ? data.checks_left : null;
+    const checksHtml = checksLeft != null
+      ? `<div class="price-meta" style="margin-top:8px">🔍 Осталось проверок: <b>${checksLeft}/${data.checks_limit}</b> на этой неделе · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">∞ PRO</span></div>`
       : "";
     container.innerHTML = `
       <div class="price-card">
@@ -767,15 +804,8 @@ async function showItemPrice(itemName) {
         </div>
       </div>`;
   } catch (e) {
-    // Лимит проверок — показываем предложение Premium
-    if (e.message.includes("проверок") || e.message.includes("429")) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="emoji">🔒</div>
-          <div style="font-weight:700;margin-bottom:8px">Лимит исчерпан</div>
-          <div style="font-size:13px;margin-bottom:16px">${e.message}</div>
-          <button class="btn btn-stars" style="max-width:200px;margin:0 auto" onclick="openPremiumModal()">⭐ Получить Premium</button>
-        </div>`;
+    if (e.message.includes("Лимит") || e.message.includes("лимит") || e.message.includes("429")) {
+      openLimitModal(e.message);
     } else {
       container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
     }
@@ -794,16 +824,24 @@ async function loadWatchlist() {
     if (!userIsPremium) {
       const used = data.items.length;
       const bonus = (window._meData && window._meData.bonus_watchlist) || 0;
-      const limit = 5 + bonus;
-      const bonusNote = bonus > 0 ? ` (+${bonus} за рефералов)` : "";
+      const limit = 7 + bonus;
+      const maxFree = 10;
+      const canWatchAd = limit < maxFree;
+      const bonusNote = bonus > 0 ? ` (+${bonus} бонус)` : "";
       if (used >= limit) {
-        html += `<div class="limit-banner" onclick="openPremiumModal()">
+        html += `<div class="limit-banner">
           <span style="font-size:22px">🔒</span>
-          <div class="limit-banner-text">Использовано ${used}/${limit} мест${bonusNote}. Пригласи друга (+3 слота) или оформи Premium.</div>
-          <button class="limit-banner-btn">⭐ PRO</button>
+          <div class="limit-banner-text">Использовано ${used}/${limit}${bonusNote}.
+            ${canWatchAd ? `<br><span style="cursor:pointer;color:#c89b3c" onclick="openWatchlistLimitModal('')">📺 Реклама → +1 слот</span> ·` : ""}
+            <span style="cursor:pointer;color:#c89b3c" onclick="openPremiumModal()"> ⭐ Premium → безлимит</span>
+          </div>
         </div>`;
       } else {
-        html += `<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Использовано ${used}/${limit} мест${bonusNote} · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">Получить безлимит ⭐</span></div>`;
+        html += `<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">
+          Слотов: ${used}/${limit}${bonusNote}
+          ${canWatchAd ? ` · <span style="color:var(--gold);cursor:pointer" onclick="openWatchlistLimitModal('')">📺 +1 слот за рекламу</span>` : ""}
+          · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">∞ Premium</span>
+        </div>`;
       }
     }
 
@@ -812,6 +850,7 @@ async function loadWatchlist() {
     } else {
       html += data.items.map(item => {
         const belowThreshold = item.threshold > 0 && item.current_price && item.current_price <= item.threshold;
+        const aboveHigh = item.threshold_high > 0 && item.current_price && item.current_price >= item.threshold_high;
         return `<div class="item-card">
           <div class="item-card-header">
             <div class="item-card-name">${item.item_name}</div>
@@ -819,15 +858,21 @@ async function loadWatchlist() {
           </div>
           <div class="item-card-row">
             <span class="item-card-label">Текущая цена</span>
-            <span class="item-card-value ${belowThreshold ? "threshold-below" : ""}">
+            <span class="item-card-value ${belowThreshold ? "threshold-below" : aboveHigh ? "profit-positive" : ""}">
               ${item.current_price ? fmt(item.current_price) + " " + item.symbol : "—"}
             </span>
           </div>
-          <div class="item-card-row">
-            <span class="item-card-label">Порог уведомления</span>
-            <span class="item-card-value">${item.threshold > 0 ? fmt(item.threshold) + " " + item.symbol : "Без порога"}</span>
-          </div>
-          ${belowThreshold ? `<div style="font-size:12px;color:var(--green);margin-top:6px">✅ Цена достигла порога!</div>` : ""}
+          ${item.threshold > 0 ? `<div class="item-card-row">
+            <span class="item-card-label">📉 Порог снижения</span>
+            <span class="item-card-value">${fmt(item.threshold)} ${item.symbol}</span>
+          </div>` : ""}
+          ${item.threshold_high > 0 ? `<div class="item-card-row">
+            <span class="item-card-label">📈 Порог роста</span>
+            <span class="item-card-value">${fmt(item.threshold_high)} ${item.symbol}</span>
+          </div>` : ""}
+          ${!item.threshold && !item.threshold_high ? `<div class="item-card-row"><span class="item-card-label">Уведомления</span><span class="item-card-value" style="color:var(--text-dim)">Без порогов</span></div>` : ""}
+          ${belowThreshold ? `<div style="font-size:12px;color:var(--green);margin-top:6px">📉 Цена достигла порога снижения!</div>` : ""}
+          ${aboveHigh ? `<div style="font-size:12px;color:var(--green);margin-top:6px">📈 Цена достигла порога роста!</div>` : ""}
         </div>`;
       }).join("");
     }
@@ -1042,36 +1087,52 @@ function selectModalItem(itemName) {
   document.getElementById("addModalSearchBox").style.display = "none";
   document.getElementById("addModalSearchButtons").style.display = "none";
   document.getElementById("addModalItemName").textContent = itemName;
-  document.getElementById("addModalValue").value = "";
 
   if (addModalMode === "watchlist") {
-    document.getElementById("addModalValue").placeholder = "Например: 500";
+    document.getElementById("addModalWatchlistFields").style.display = "block";
+    document.getElementById("addModalPortfolioField").style.display = "none";
+    document.getElementById("addModalValueLow").value = "";
+    document.getElementById("addModalValueHigh").value = "";
     document.getElementById("addModalHint").textContent =
-      "Укажи порог цены — получишь уведомление когда предмет подешевеет до этой суммы. Введи 0 если хочешь просто отслеживать без уведомлений.";
+      "Оба порога необязательны. Оставь 0 если не нужно уведомление для этого направления.";
   } else {
+    document.getElementById("addModalWatchlistFields").style.display = "none";
+    document.getElementById("addModalPortfolioField").style.display = "block";
+    document.getElementById("addModalValue").value = "";
     document.getElementById("addModalValue").placeholder = "Например: 1200.50";
     document.getElementById("addModalHint").textContent =
-      "Укажи цену за которую ты купил этот предмет — бот будет считать твою прибыль или убыток относительно текущей рыночной цены.";
+      "Укажи цену покупки — бот будет считать прибыль/убыток относительно текущей цены.";
   }
 
   document.getElementById("addModalForm").style.display = "block";
-  setTimeout(() => document.getElementById("addModalValue").focus(), 100);
+  setTimeout(() => {
+    const f = addModalMode === "watchlist"
+      ? document.getElementById("addModalValueLow")
+      : document.getElementById("addModalValue");
+    f.focus();
+  }, 100);
 }
 
 async function submitAdd() {
   if (!addModalSelectedItem) return;
-  const val = parseFloat(document.getElementById("addModalValue").value) || 0;
 
   try {
     if (addModalMode === "watchlist") {
+      const tLow = parseFloat(document.getElementById("addModalValueLow").value) || 0;
+      const tHigh = parseFloat(document.getElementById("addModalValueHigh").value) || 0;
       await apiFetch("/api/watchlist", {
         method: "POST",
-        body: JSON.stringify({ item_name: addModalSelectedItem, threshold: val }),
+        body: JSON.stringify({
+          item_name: addModalSelectedItem,
+          threshold: tLow,
+          threshold_high: tHigh > 0 ? tHigh : null,
+        }),
       });
       showToast("Добавлено в вотчлист ⭐");
       closeAddModal();
       loadWatchlist();
     } else {
+      const val = parseFloat(document.getElementById("addModalValue").value) || 0;
       if (val <= 0) { showToast("Введи цену покупки"); return; }
       await apiFetch("/api/portfolio", {
         method: "POST",
@@ -1082,7 +1143,10 @@ async function submitAdd() {
       loadPortfolio();
     }
   } catch (e) {
-    if (e.message.includes("Premium") || e.message.includes("Бесплатный")) {
+    if (e.message.includes("лимит") || e.message.includes("Достигнут")) {
+      closeAddModal();
+      openWatchlistLimitModal(e.message);
+    } else if (e.message.includes("Premium") || e.message.includes("Бесплатный")) {
       closeAddModal();
       openPremiumModal();
     } else {
@@ -1104,6 +1168,63 @@ function addToPortfolioQuick(itemName, price) {
     selectModalItem(itemName);
     setTimeout(() => { document.getElementById("addModalValue").value = price; }, 50);
   }, 50);
+}
+
+// ── Adsgram & лимит ───────────────────────────────────────────────────────────
+
+function openLimitModal(msg) {
+  document.getElementById("limitModalText").textContent = msg ||
+    "Лимит проверок цены на этой неделе исчерпан. Посмотри рекламу чтобы получить +3 проверки, или оформи Premium.";
+  document.getElementById("limitModal").classList.add("open");
+}
+
+function closeLimitModal() {
+  document.getElementById("limitModal").classList.remove("open");
+}
+
+function openWatchlistLimitModal(msg) {
+  // Для лимита вотчлиста открываем тот же модал но с другой кнопкой рекламы
+  const btn = document.getElementById("watchAdBtn");
+  btn.textContent = "📺 Смотреть рекламу (+1 слот вотчлиста)";
+  btn.onclick = () => watchAdForReward("watchlist");
+  document.getElementById("limitModalText").textContent = msg ||
+    "Достигнут лимит вотчлиста. Посмотри рекламу (+1 слот) или оформи Premium.";
+  document.getElementById("limitModal").classList.add("open");
+}
+
+async function watchAdForReward(rewardType) {
+  if (!adController) {
+    showToast("Реклама временно недоступна");
+    return;
+  }
+  try {
+    closeLimitModal();
+    showToast("⏳ Загружаю рекламу...");
+    await adController.show();
+    // Реклама просмотрена — начисляем бонус
+    const result = await apiFetch("/api/ad-reward", {
+      method: "POST",
+      body: JSON.stringify({ reward_type: rewardType }),
+    });
+    showToast("✅ " + result.message);
+    // Обновляем данные в памяти
+    if (rewardType === "price_checks" && window._meData) {
+      window._meData.checks_left = result.checks_left;
+      window._meData.checks_limit = result.checks_limit;
+    }
+    if (rewardType === "watchlist" && window._meData) {
+      window._meData.bonus_watchlist = (window._meData.bonus_watchlist || 0) + 1;
+      window._meData.watchlist_limit = result.watchlist_limit;
+      loadWatchlist();
+    }
+  } catch(e) {
+    // Пользователь закрыл рекламу или ошибка
+    if (e && e.done === false) {
+      showToast("Нужно досмотреть рекламу до конца");
+    } else {
+      showToast(e.message || "Ошибка загрузки рекламы");
+    }
+  }
 }
 
 // ── Premium ───────────────────────────────────────────────────────────────────
@@ -1155,7 +1276,7 @@ function openCurrencyModal() { document.getElementById("currencyModal").classLis
 function closeCurrencyModal() { document.getElementById("currencyModal").classList.remove("open"); }
 
 // Закрытие модалок по клику на overlay
-["addModal","currencyModal","premiumModal"].forEach(id => {
+["addModal","currencyModal","premiumModal","limitModal"].forEach(id => {
   document.getElementById(id).addEventListener("click", function(e) {
     if (e.target === this) this.classList.remove("open");
   });
