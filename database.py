@@ -19,7 +19,8 @@ def init_db():
                 premium INTEGER DEFAULT 0,
                 compare_count INTEGER DEFAULT 0,
                 week_start TEXT DEFAULT '',
-                bonus_compares INTEGER DEFAULT 0
+                bonus_compares INTEGER DEFAULT 0,
+                bonus_watchlist INTEGER DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS watchlist (
@@ -63,11 +64,15 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now'))
             );
         """)
-        # Миграция: добавляем колонку last_notified если её ещё нет
-        try:
-            conn.execute("ALTER TABLE watchlist ADD COLUMN last_notified TEXT DEFAULT NULL")
-        except Exception:
-            pass  # колонка уже существует
+        # Миграции: добавляем колонки если их ещё нет
+        for migration in [
+            "ALTER TABLE watchlist ADD COLUMN last_notified TEXT DEFAULT NULL",
+            "ALTER TABLE user_settings ADD COLUMN bonus_watchlist INTEGER DEFAULT 0",
+        ]:
+            try:
+                conn.execute(migration)
+            except Exception:
+                pass  # колонка уже существует
 
 
 # ── user_settings ──────────────────────────────────────────────────────────────
@@ -84,7 +89,7 @@ def get_user_settings(user_id: int) -> dict:
             "INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)", (user_id,)
         )
         return {"user_id": user_id, "currency": "RUB", "premium": 0,
-                "compare_count": 0, "week_start": "", "bonus_compares": 0}
+                "compare_count": 0, "week_start": "", "bonus_compares": 0, "bonus_watchlist": 0}
 
 
 def set_user_currency(user_id: int, currency: str):
@@ -242,12 +247,12 @@ def add_referral(referrer_id: int, referred_id: int) -> bool:
                 "INSERT INTO referrals (referrer_id, referred_id) VALUES (?, ?)",
                 (referrer_id, referred_id)
             )
-            # Даём рефереру +3 бонусных сравнения
+            # Даём рефереру +3 бонусных слота в вотчлисте
             conn.execute("""
-                INSERT INTO user_settings (user_id, bonus_compares)
+                INSERT INTO user_settings (user_id, bonus_watchlist)
                 VALUES (?, 3)
                 ON CONFLICT(user_id) DO UPDATE
-                    SET bonus_compares = bonus_compares + 3
+                    SET bonus_watchlist = bonus_watchlist + 3
             """, (referrer_id,))
             return True
         except sqlite3.IntegrityError:
@@ -319,3 +324,27 @@ def get_event_count(event_type: str, since_hours: int = 24) -> int:
             (event_type, f"-{since_hours} hours")
         ).fetchone()
         return row["cnt"] if row else 0
+
+
+# ── price check rate-limit ─────────────────────────────────────────────────────
+
+def get_price_checks_today(user_id: int) -> int:
+    """Количество проверок цены пользователем за сегодня (UTC)."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM daily_events "
+            "WHERE event_type = ? AND created_at >= date('now')",
+            (f"pc_{user_id}",)
+        ).fetchone()
+        return row["cnt"] if row else 0
+
+
+def log_user_price_check(user_id: int):
+    """Фиксирует проверку цены для пользователя."""
+    log_event(f"pc_{user_id}")
+
+
+def get_bonus_watchlist(user_id: int) -> int:
+    """Возвращает количество бонусных слотов вотчлиста (за рефералов)."""
+    settings = get_user_settings(user_id)
+    return settings.get("bonus_watchlist", 0)

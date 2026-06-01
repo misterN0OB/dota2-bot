@@ -30,25 +30,33 @@ from database import (
     record_price,
     get_price_history,
     touch_activity,
+    get_price_checks_today,
+    log_user_price_check,
+    get_bonus_watchlist,
 )
 from skin_checker import get_item_price, search_items, CURRENCIES
 
 # Лимиты для бесплатных пользователей
-FREE_WATCHLIST_LIMIT = 3
+FREE_WATCHLIST_LIMIT = 5
 FREE_PORTFOLIO_LIMIT = 5
+FREE_DAILY_PRICE_CHECKS = 20  # бесплатных проверок цены в день
 
-# Топ популярных предметов Dota 2
+# Популярные предметы Dota 2 (топ по популярности торгов)
 TOP_ITEMS = [
     "Dragonclaw Hook",
     "Genuine Dragonclaw Hook",
     "Tempest Helm of the Thundergod",
-    "Arcana",
-    "Demon Edge (Unusual)",
-    "Inscribed Corrupted Monarch Bow",
-    "Inscribed Blades of the Reaper",
     "Sylvan Cascade",
-    "Frostivus Treant",
+    "Inscribed Blades of the Reaper",
+]
+
+# Самые дорогие предметы Dota 2
+EXPENSIVE_ITEMS = [
+    "Genuine Dragonclaw Hook",
+    "Dragonclaw Hook",
+    "Tempest Helm of the Thundergod",
     "Genuine Resonant Virtue",
+    "Inscribed Corrupted Monarch Bow",
 ]
 
 logger = logging.getLogger(__name__)
@@ -144,6 +152,9 @@ def get_me(user: dict = Depends(get_current_user)):
     settings = get_user_settings(user_id)
     currency = settings.get("currency", "RUB")
     cur_info = CURRENCIES.get(currency, CURRENCIES["RUB"])
+    premium = is_premium(user_id)
+    checks_today = get_price_checks_today(user_id)
+    bonus_wl = get_bonus_watchlist(user_id)
     return {
         "user": user,
         "currency": currency,
@@ -152,6 +163,10 @@ def get_me(user: dict = Depends(get_current_user)):
             {"code": code, "name": info["name"], "symbol": info["symbol"]}
             for code, info in CURRENCIES.items()
         ],
+        "price_checks_today": checks_today,
+        "price_checks_limit": None if premium else FREE_DAILY_PRICE_CHECKS,
+        "price_checks_left": None if premium else max(0, FREE_DAILY_PRICE_CHECKS - checks_today),
+        "bonus_watchlist": bonus_wl,
     }
 
 
@@ -165,7 +180,7 @@ def set_currency(body: CurrencyRequest, user: dict = Depends(get_current_user)):
 
 @app.get("/api/search")
 def search(q: str = Query(..., min_length=2), user: dict = Depends(get_current_user)):
-    """Поиск предметов по частичному названию."""
+    """Поиск предметов по частичному названию. Возвращает [{name, icon}]."""
     results = search_items(q, count=8)
     return {"results": results}
 
@@ -176,12 +191,28 @@ def price(
     user: dict = Depends(get_current_user),
 ):
     """Получить текущую цену предмета."""
-    settings = get_user_settings(user["id"])
+    user_id = user["id"]
+    settings = get_user_settings(user_id)
+
+    # Лимит проверок цены для бесплатных пользователей
+    if not is_premium(user_id):
+        checks_today = get_price_checks_today(user_id)
+        if checks_today >= FREE_DAILY_PRICE_CHECKS:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"Бесплатный план — максимум {FREE_DAILY_PRICE_CHECKS} проверок цены в день. "
+                    f"Оформи Premium для безлимитного доступа."
+                )
+            )
+
     currency = settings.get("currency", "RUB")
     data = get_item_price(item, currency)
     if not data:
         raise HTTPException(status_code=404, detail="Item not found or Steam unavailable")
-    # Сохраняем в историю
+
+    # Логируем проверку и сохраняем в историю
+    log_user_price_check(user_id)
     if data["lowest"] > 0:
         record_price(item, data["lowest"])
     return data
@@ -211,10 +242,15 @@ def add_watchlist_api(body: WatchlistAddRequest, user: dict = Depends(get_curren
     user_id = user["id"]
     if not is_premium(user_id):
         current = get_watchlist(user_id)
-        if len(current) >= FREE_WATCHLIST_LIMIT:
+        bonus = get_bonus_watchlist(user_id)
+        effective_limit = FREE_WATCHLIST_LIMIT + bonus
+        if len(current) >= effective_limit:
             raise HTTPException(
                 status_code=403,
-                detail=f"Бесплатный план — максимум {FREE_WATCHLIST_LIMIT} предмета в вотчлисте. Оформи Premium для безлимитного доступа."
+                detail=(
+                    f"Бесплатный план — максимум {effective_limit} предметов в вотчлисте. "
+                    f"Пригласи друга (+3 слота) или оформи Premium для безлимитного доступа."
+                )
             )
     added = add_to_watchlist(user_id, body.item_name, body.threshold)
     if not added:
@@ -316,22 +352,45 @@ def get_history(item: str = Query(...), user: dict = Depends(get_current_user)):
     }
 
 
-@app.get("/api/top-items")
-def get_top_items(user: dict = Depends(get_current_user)):
-    """Топ популярных предметов с текущими ценами."""
-    settings = get_user_settings(user["id"])
-    currency = settings.get("currency", "RUB")
-    symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
-
+def _fetch_item_list(item_names: list, currency: str, symbol: str) -> list:
+    """Вспомогательная функция: получает цены и иконки для списка предметов."""
     result = []
-    for item_name in TOP_ITEMS[:6]:  # первые 6 для главного экрана
+    # Получаем иконки через поиск (кэшированные имена)
+    icon_map = {}
+    for item_name in item_names:
+        items = search_items(item_name, count=1)
+        if items:
+            icon_map[item_name] = items[0].get("icon", "")
+
+    for item_name in item_names:
         price_data = get_item_price(item_name, currency)
         if price_data and price_data["lowest"] > 0:
             result.append({
                 "item_name": item_name,
                 "lowest": price_data["lowest"],
                 "symbol": symbol,
+                "icon": icon_map.get(item_name, ""),
             })
+    return result
+
+
+@app.get("/api/top-items")
+def get_top_items(user: dict = Depends(get_current_user)):
+    """Популярные предметы с текущими ценами."""
+    settings = get_user_settings(user["id"])
+    currency = settings.get("currency", "RUB")
+    symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
+    result = _fetch_item_list(TOP_ITEMS, currency, symbol)
+    return {"items": result}
+
+
+@app.get("/api/expensive-items")
+def get_expensive_items(user: dict = Depends(get_current_user)):
+    """Самые дорогие предметы с текущими ценами."""
+    settings = get_user_settings(user["id"])
+    currency = settings.get("currency", "RUB")
+    symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
+    result = _fetch_item_list(EXPENSIVE_ITEMS, currency, symbol)
     return {"items": result}
 
 

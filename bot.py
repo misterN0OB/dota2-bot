@@ -81,7 +81,7 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
 )
 
 MINIAPP_BUTTON = InlineKeyboardMarkup([[
-    InlineKeyboardButton("🎮 Открыть трекер цен", web_app=WebAppInfo(url=MINIAPP_URL))
+    InlineKeyboardButton("🚀 ОТКРЫТЬ ТРЕКЕР ЦЕН 🎮", web_app=WebAppInfo(url=MINIAPP_URL))
 ]])
 
 
@@ -91,6 +91,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     touch_activity(user.id)
     log_event("start")
+
+    # Авто-премиум для администратора (для тестирования)
+    if user.id == ADMIN_ID:
+        set_premium(user.id, True)
 
     # Реферальная программа: /start ref_<referrer_id>
     args = context.args
@@ -102,8 +106,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if added:
                     await context.bot.send_message(
                         chat_id=referrer_id,
-                        text=f"👥 По твоей ссылке зарегистрировался новый пользователь!\n"
-                             f"+3 сравнения Steam vs DMarket начислены.",
+                        text=(
+                            f"🎉 По твоей ссылке зарегистрировался новый пользователь!\n\n"
+                            f"🎁 Тебе начислено <b>+3 слота</b> в вотчлисте.\n"
+                            f"Приглашай больше друзей — получай ещё слоты!"
+                        ),
+                        parse_mode="HTML",
                     )
         except (ValueError, Exception):
             pass
@@ -111,13 +119,14 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"👋 Привет, {user.first_name}!\n\n"
         "Я слежу за ценами предметов <b>Dota 2</b> на Steam Market.\n\n"
-        "Выбери что хочешь сделать:",
+        "📊 Проверяй цены, отслеживай предметы и считай прибыль — всё в одном месте.\n\n"
+        "👇 Открой трекер или выбери действие:",
         parse_mode="HTML",
-        reply_markup=MAIN_KEYBOARD,
+        reply_markup=MINIAPP_BUTTON,
     )
     await update.message.reply_text(
-        "Или открой полный трекер с графиками и портфелем 👇",
-        reply_markup=MINIAPP_BUTTON,
+        "Или используй команды бота:",
+        reply_markup=MAIN_KEYBOARD,
     )
 
 
@@ -155,13 +164,13 @@ async def price_enter_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Показываем inline-кнопки с найденными предметами
     buttons = [
-        [InlineKeyboardButton(name, callback_data=f"price:{name}")]
-        for name in results
+        [InlineKeyboardButton(item["name"], callback_data=f"price:{item['name']}")]
+        for item in results
     ]
     buttons.append([InlineKeyboardButton("❌ Отмена", callback_data="price:cancel")])
 
     await update.message.reply_text(
-        f"Нашёл {len(results)} предмет(ов). Выбери нужный:",
+        f"Нашёл {len(results)} предмет(ов). Выбери нужный 👇",
         reply_markup=InlineKeyboardMarkup(buttons),
     )
     return PRICE_SELECT_ITEM
@@ -267,8 +276,8 @@ async def watch_enter_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return WATCH_ENTER_QUERY
 
     buttons = [
-        [InlineKeyboardButton(name, callback_data=f"watch_item:{name}")]
-        for name in results
+        [InlineKeyboardButton(item["name"], callback_data=f"watch_item:{item['name']}")]
+        for item in results
     ]
     buttons.append([InlineKeyboardButton("❌ Отмена", callback_data="watch_item:cancel")])
 

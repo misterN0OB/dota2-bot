@@ -154,12 +154,22 @@
     background: var(--card); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 10px 14px;
     margin-bottom: 8px;
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; gap: 10px; justify-content: space-between;
     cursor: pointer; transition: border-color 0.15s;
   }
   .top-item:active { border-color: var(--gold-dim); }
+  .top-item-img {
+    width: 40px; height: 40px; border-radius: 6px;
+    object-fit: cover; background: var(--border); flex-shrink: 0;
+  }
   .top-item-name { font-size: 13px; font-weight: 500; flex: 1; margin-right: 8px; }
   .top-item-price { font-size: 14px; font-weight: 700; color: var(--gold); white-space: nowrap; }
+
+  /* Search result с картинкой */
+  .result-img {
+    width: 36px; height: 36px; border-radius: 6px;
+    object-fit: cover; background: var(--border); flex-shrink: 0;
+  }
 
   /* ── Search ── */
   .search-box { display: flex; gap: 8px; margin-bottom: 16px; }
@@ -396,12 +406,12 @@
     </div>
   </div>
 
-  <!-- DMarket баннер -->
-  <a class="dmarket-banner" href="https://dmarket.com/ingame-items/item-list/dota2-skins" target="_blank">
+  <!-- DMarket баннер (реферальная ссылка — замени REFCODE на свой код партнёра) -->
+  <a class="dmarket-banner" href="https://dmarket.com/ingame-items/item-list/dota2-skins?ref=REFCODE&utm_source=tgbot&utm_medium=banner" target="_blank">
     <span class="dmarket-logo">💎</span>
     <div class="dmarket-text">
       <div class="dmarket-title">Торгуй на DMarket</div>
-      <div class="dmarket-sub">Купи и продай предметы Dota 2 выгодно</div>
+      <div class="dmarket-sub">Лучшие цены на скины Dota 2 · P2P маркет</div>
     </div>
     <span class="dmarket-arrow">›</span>
   </a>
@@ -409,6 +419,12 @@
   <!-- Топ предметы -->
   <div class="section-title">🔥 Популярные предметы</div>
   <div id="topItemsList">
+    <div class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <!-- Дорогие предметы -->
+  <div class="section-title" style="margin-top:16px">💎 Самые дорогие</div>
+  <div id="expensiveItemsList">
     <div class="loading"><div class="spinner"></div></div>
   </div>
 </div>
@@ -580,6 +596,9 @@ async function init() {
     document.getElementById("currencyBadge").textContent = currentCurrency;
     renderCurrencyList(me.currencies);
 
+    // Сохраняем данные из /api/me
+    window._meData = me;
+
     // Проверяем премиум
     const prem = await apiFetch("/api/premium");
     userIsPremium = prem.premium;
@@ -587,7 +606,17 @@ async function init() {
       document.getElementById("premiumBadge").classList.add("show");
     }
 
+    // Показываем счётчик проверок цены если не премиум
+    if (!userIsPremium && me.price_checks_left != null) {
+      const left = me.price_checks_left;
+      const limit = me.price_checks_limit;
+      if (left <= 5) {
+        showToast(`⚠️ Осталось ${left}/${limit} проверок цены сегодня`);
+      }
+    }
+
     loadTopItems();
+    loadExpensiveItems();
   } catch (e) {
     showToast("❌ " + (e.message || "Ошибка подключения"));
   }
@@ -616,21 +645,41 @@ function switchPage(page, btn) {
 
 // ── Home page ─────────────────────────────────────────────────────────────────
 
+function itemImgHtml(icon) {
+  if (!icon) return "";
+  const src = `https://community.akamai.steamstatic.com/economy/image/${icon}/62fx62f`;
+  return `<img class="top-item-img" src="${src}" alt="" loading="lazy" onerror="this.style.display='none'">`;
+}
+
+function renderItemList(items, containerId) {
+  const container = document.getElementById(containerId);
+  if (!items.length) {
+    container.innerHTML = `<div style="color:var(--text-dim);font-size:13px">Нет данных</div>`;
+    return;
+  }
+  container.innerHTML = items.map(item => `
+    <div class="top-item" onclick="goToItemPrice('${item.item_name.replace(/'/g,"\\'")}')">
+      ${itemImgHtml(item.icon)}
+      <span class="top-item-name">${item.item_name}</span>
+      <span class="top-item-price">${fmt(item.lowest)} ${item.symbol}</span>
+    </div>`).join("");
+}
+
 async function loadTopItems() {
-  const container = document.getElementById("topItemsList");
   try {
     const data = await apiFetch("/api/top-items");
-    if (!data.items.length) {
-      container.innerHTML = `<div style="color:var(--text-dim);font-size:13px">Нет данных</div>`;
-      return;
-    }
-    container.innerHTML = data.items.map(item => `
-      <div class="top-item" onclick="goToItemPrice('${item.item_name.replace(/'/g,"\\'")}')">
-        <span class="top-item-name">${item.item_name}</span>
-        <span class="top-item-price">${fmt(item.lowest)} ${item.symbol}</span>
-      </div>`).join("");
+    renderItemList(data.items, "topItemsList");
   } catch (e) {
-    container.innerHTML = `<div style="color:var(--text-dim);font-size:13px">Не удалось загрузить топ</div>`;
+    document.getElementById("topItemsList").innerHTML = `<div style="color:var(--text-dim);font-size:13px">Не удалось загрузить</div>`;
+  }
+}
+
+async function loadExpensiveItems() {
+  try {
+    const data = await apiFetch("/api/expensive-items");
+    renderItemList(data.items, "expensiveItemsList");
+  } catch (e) {
+    document.getElementById("expensiveItemsList").innerHTML = `<div style="color:var(--text-dim);font-size:13px">Не удалось загрузить</div>`;
   }
 }
 
@@ -671,11 +720,13 @@ async function doSearch() {
       return;
     }
     container.innerHTML = `<div class="section-title">Результаты поиска</div><div class="results-list">` +
-      data.results.map(name =>
-        `<div class="result-item" onclick="showItemPrice('${name.replace(/'/g,"\\'")}')">
-          <span class="result-name">${name}</span><span class="result-arrow">›</span>
-        </div>`
-      ).join("") + `</div>`;
+      data.results.map(item => {
+        const name = item.name || item;
+        const imgHtml = item.icon ? `<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/${item.icon}/62fx62f" alt="" loading="lazy" onerror="this.style.display='none'">` : "";
+        return `<div class="result-item" onclick="showItemPrice('${name.replace(/'/g,"\\'")}')">
+          ${imgHtml}<span class="result-name">${name}</span><span class="result-arrow">›</span>
+        </div>`;
+      }).join("") + `</div>`;
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
   }
@@ -687,6 +738,15 @@ async function showItemPrice(itemName) {
 
   try {
     const data = await apiFetch(`/api/price?item=${encodeURIComponent(itemName)}`);
+    // Обновляем счётчик проверок в памяти
+    if (window._meData && window._meData.price_checks_left != null) {
+      window._meData.price_checks_left = Math.max(0, window._meData.price_checks_left - 1);
+      window._meData.price_checks_today = (window._meData.price_checks_today || 0) + 1;
+    }
+    const checksLeft = window._meData && window._meData.price_checks_left;
+    const checksHtml = (!userIsPremium && checksLeft != null)
+      ? `<div class="price-meta" style="margin-top:8px">🔍 Осталось проверок сегодня: <b>${checksLeft}</b> · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">∞ PRO</span></div>`
+      : "";
     container.innerHTML = `
       <div class="price-card">
         <div class="price-card-name">${data.item_name}</div>
@@ -699,6 +759,7 @@ async function showItemPrice(itemName) {
           <span class="price-value">${fmt(data.median)} ${data.symbol}</span>
         </div>
         ${data.volume ? `<div class="price-meta">📦 Продано за 24ч: ${data.volume}</div>` : ""}
+        ${checksHtml}
         <div class="price-actions">
           <button class="btn btn-secondary" onclick="doSearch()">◀ Назад</button>
           <button class="btn btn-secondary" onclick="addToWatchlistQuick('${itemName.replace(/'/g,"\\'")}')">⭐</button>
@@ -706,7 +767,18 @@ async function showItemPrice(itemName) {
         </div>
       </div>`;
   } catch (e) {
-    container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
+    // Лимит проверок — показываем предложение Premium
+    if (e.message.includes("проверок") || e.message.includes("429")) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="emoji">🔒</div>
+          <div style="font-weight:700;margin-bottom:8px">Лимит исчерпан</div>
+          <div style="font-size:13px;margin-bottom:16px">${e.message}</div>
+          <button class="btn btn-stars" style="max-width:200px;margin:0 auto" onclick="openPremiumModal()">⭐ Получить Premium</button>
+        </div>`;
+    } else {
+      container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
+    }
   }
 }
 
@@ -721,15 +793,17 @@ async function loadWatchlist() {
     let html = "";
     if (!userIsPremium) {
       const used = data.items.length;
-      const limit = 3;
+      const bonus = (window._meData && window._meData.bonus_watchlist) || 0;
+      const limit = 5 + bonus;
+      const bonusNote = bonus > 0 ? ` (+${bonus} за рефералов)` : "";
       if (used >= limit) {
         html += `<div class="limit-banner" onclick="openPremiumModal()">
           <span style="font-size:22px">🔒</span>
-          <div class="limit-banner-text">Использовано ${used}/${limit} мест. Оформи Premium для безлимитного вотчлиста.</div>
+          <div class="limit-banner-text">Использовано ${used}/${limit} мест${bonusNote}. Пригласи друга (+3 слота) или оформи Premium.</div>
           <button class="limit-banner-btn">⭐ PRO</button>
         </div>`;
       } else {
-        html += `<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Использовано ${used}/${limit} мест · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">Получить безлимит ⭐</span></div>`;
+        html += `<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Использовано ${used}/${limit} мест${bonusNote} · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">Получить безлимит ⭐</span></div>`;
       }
     }
 
@@ -865,11 +939,12 @@ async function doChartSearch() {
       return;
     }
     container.innerHTML = `<div class="results-list" style="margin-bottom:12px">` +
-      data.results.map(name =>
-        `<div class="result-item" onclick="loadChart('${name.replace(/'/g,"\\'")}')">
+      data.results.map(item => {
+        const name = item.name || item;
+        return `<div class="result-item" onclick="loadChart('${name.replace(/'/g,"\\'")}')">
           <span class="result-name">${name}</span><span class="result-arrow">›</span>
-        </div>`
-      ).join("") + `</div>`;
+        </div>`;
+      }).join("") + `</div>`;
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><div>${e.message}</div></div>`;
   }
@@ -950,11 +1025,13 @@ async function doModalSearch() {
       return;
     }
     container.innerHTML = `<div class="results-list" style="margin-top:8px;max-height:200px;overflow-y:auto">` +
-      data.results.map(name =>
-        `<div class="result-item" onclick="selectModalItem('${name.replace(/'/g,"\\'")}')">
-          <span class="result-name" style="font-size:13px">${name}</span>
-        </div>`
-      ).join("") + `</div>`;
+      data.results.map(item => {
+        const name = item.name || item;
+        const imgHtml = item.icon ? `<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/${item.icon}/62fx62f" alt="" loading="lazy" onerror="this.style.display='none'">` : "";
+        return `<div class="result-item" onclick="selectModalItem('${name.replace(/'/g,"\\'")}')">
+          ${imgHtml}<span class="result-name" style="font-size:13px">${name}</span>
+        </div>`;
+      }).join("") + `</div>`;
   } catch (e) {
     container.innerHTML = `<div style="color:var(--red);font-size:13px">${e.message}</div>`;
   }
@@ -1047,61 +1124,4 @@ function renderCurrencyList(currencies) {
   list.innerHTML = currencies.map(c => `
     <div class="currency-option ${c.code === currentCurrency ? "selected" : ""}"
       onclick="selectCurrency('${c.code}', '${c.symbol}', this)">
-      <span class="currency-option-name">${c.name}</span>
-      <span>
-        <span class="currency-option-sym">${c.symbol}</span>
-        ${c.code === currentCurrency ? '<span class="currency-check">✓</span>' : ''}
-      </span>
-    </div>`).join("");
-}
-
-async function selectCurrency(code, symbol, el) {
-  try {
-    await apiFetch("/api/settings/currency", {
-      method: "POST",
-      body: JSON.stringify({ currency: code }),
-    });
-    currentCurrency = code;
-    currentSymbol = symbol;
-    document.getElementById("currencyBadge").textContent = code;
-    document.querySelectorAll(".currency-option").forEach(o => {
-      o.classList.remove("selected");
-      o.querySelector(".currency-check")?.remove();
-    });
-    el.classList.add("selected");
-    closeCurrencyModal();
-    showToast(`Валюта: ${code}`);
-  } catch (e) { showToast(e.message); }
-}
-
-function openCurrencyModal() { document.getElementById("currencyModal").classList.add("open"); }
-function closeCurrencyModal() { document.getElementById("currencyModal").classList.remove("open"); }
-
-// Закрытие модалок по клику на overlay
-["addModal","currencyModal","premiumModal"].forEach(id => {
-  document.getElementById(id).addEventListener("click", function(e) {
-    if (e.target === this) this.classList.remove("open");
-  });
-});
-
-// ── Utils ─────────────────────────────────────────────────────────────────────
-
-function fmt(n) {
-  if (n == null) return "—";
-  return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-let toastTimer;
-function showToast(msg) {
-  const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
-}
-
-// ── Start ─────────────────────────────────────────────────────────────────────
-init();
-</script>
-</body>
-</html>
+      <span class="currency-option-na

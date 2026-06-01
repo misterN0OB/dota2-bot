@@ -94,10 +94,10 @@ def get_item_price(item_name: str, currency: str = "RUB") -> dict | None:
         return None
 
 
-def search_items(query: str, count: int = 5) -> list[str]:
+def search_items(query: str, count: int = 5) -> list[dict]:
     """
     Ищет предметы по частичному названию.
-    Возвращает список точных market_hash_name.
+    Возвращает список dict с ключами: name, icon.
 
     Важно: с датацентровых IP (Oracle Cloud) currency в search/render игнорируется.
     Поэтому используем только названия из результатов, не цены.
@@ -118,12 +118,13 @@ def search_items(query: str, count: int = 5) -> list[str]:
         data = resp.json()
 
         results = data.get("results", [])
-        names = []
+        items = []
         for item in results:
             name = item.get("hash_name") or item.get("name")
+            icon = item.get("asset_description", {}).get("icon_url", "")
             if name:
-                names.append(name)
-        return names
+                items.append({"name": name, "icon": icon})
+        return items
     except Exception as e:
         logger.warning("search_items error for '%s': %s", query, e)
         return []
