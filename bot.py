@@ -64,7 +64,7 @@ SETTINGS_CHOOSE = 20
 # ── Главная клавиатура ─────────────────────────────────────────────────────────
 
 # Замени на свой URL после деплоя на Vercel
-MINIAPP_URL = "https://miniapp-liard-nine.vercel.app"
+MINIAPP_URL = "https://mistern0ob.github.io/dota2-bot/"
 MINIAPP_LINK = "https://t.me/Dota2PriceBot/prices"
 
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
