@@ -10,6 +10,7 @@ from telegram import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     WebAppInfo,
+    LabeledPrice,
 )
 from telegram.ext import (
     Application,
@@ -17,6 +18,7 @@ from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
     ConversationHandler,
+    PreCheckoutQueryHandler,
     ContextTypes,
     filters,
 )
@@ -26,6 +28,8 @@ from database import (
     init_db,
     get_user_settings,
     set_user_currency,
+    is_premium,
+    set_premium,
     add_to_watchlist,
     get_watchlist,
     remove_from_watchlist,
@@ -458,6 +462,61 @@ async def share_referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ── Общий обработчик неизвестных сообщений ────────────────────────────────────
 
+STARS_PRICE = 200  # стоимость Premium в Telegram Stars
+
+
+async def cmd_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отправляет инвойс для оплаты Premium через Telegram Stars."""
+    user_id = update.effective_user.id
+    touch_activity(user_id)
+
+    if is_premium(user_id):
+        await update.message.reply_text(
+            "⭐ У тебя уже есть <b>Premium</b>! Спасибо за поддержку 🙏",
+            parse_mode="HTML",
+        )
+        return
+
+    await update.message.reply_invoice(
+        title="Dota 2 Price Tracker — Premium",
+        description=(
+            "✅ Безлимитный вотчлист\n"
+            "✅ Безлимитный портфель\n"
+            "✅ Без рекламы\n"
+            "✅ Приоритетная поддержка"
+        ),
+        payload="premium_purchase",
+        currency="XTR",  # Telegram Stars
+        prices=[LabeledPrice("Premium доступ", STARS_PRICE)],
+    )
+
+
+async def pre_checkout(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Подтверждаем оплату Stars."""
+    query = update.pre_checkout_query
+    if query.invoice_payload == "premium_purchase":
+        await query.answer(ok=True)
+    else:
+        await query.answer(ok=False, error_message="Неизвестный товар")
+
+
+async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Активируем Premium после успешной оплаты."""
+    user_id = update.effective_user.id
+    payment = update.message.successful_payment
+
+    if payment.invoice_payload == "premium_purchase":
+        set_premium(user_id, True)
+        log_event("premium_purchase")
+        await update.message.reply_text(
+            "🎉 <b>Premium активирован!</b>\n\n"
+            "Теперь у тебя безлимитный вотчлист и портфель.\n"
+            "Спасибо за поддержку! ⭐",
+            parse_mode="HTML",
+            reply_markup=MAIN_KEYBOARD,
+        )
+
+
 async def unknown_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Выбери действие из меню 👇",
@@ -544,6 +603,9 @@ def main():
     # Пригласить
     app.add_handler(MessageHandler(filters.Regex("^👥 Пригласить$"), share_referral))
     app.add_handler(CommandHandler("share", share_referral))
+    app.add_handler(CommandHandler("premium", cmd_premium))
+    app.add_handler(PreCheckoutQueryHandler(pre_checkout))
+    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
 
     # Fallback
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unknown_message))

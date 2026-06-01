@@ -101,6 +101,15 @@ def is_premium(user_id: int) -> bool:
     return bool(settings.get("premium"))
 
 
+def set_premium(user_id: int, value: bool = True):
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO user_settings (user_id, premium)
+            VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET premium = excluded.premium
+        """, (user_id, int(value)))
+
+
 def get_compares_left(user_id: int, free_per_week: int) -> int:
     """Возвращает оставшееся количество сравнений на этой неделе."""
     settings = get_user_settings(user_id)

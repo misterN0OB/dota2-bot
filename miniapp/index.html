@@ -44,38 +44,31 @@
     top: 0;
     z-index: 100;
   }
-  .header-logo {
-    width: 28px; height: 28px;
-    background: var(--accent);
-    border-radius: 6px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px;
+  .header-logo { font-size: 22px; }
+  .header-title { font-size: 17px; font-weight: 700; color: var(--gold); }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .premium-badge {
+    background: linear-gradient(135deg, #c89b3c, #8a6b28);
+    border-radius: 6px; padding: 3px 8px;
+    font-size: 11px; font-weight: 700; color: #000;
+    display: none;
   }
-  .header-title { font-size: 17px; font-weight: 700; color: var(--gold); letter-spacing: 0.3px; }
+  .premium-badge.show { display: block; }
   .currency-badge {
-    margin-left: auto;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-size: 13px;
-    color: var(--text-dim);
-    cursor: pointer;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 10px;
+    font-size: 13px; color: var(--text-dim); cursor: pointer;
   }
   .currency-badge:active { opacity: 0.7; }
 
   /* ── Nav ── */
   .nav {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    display: flex;
-    z-index: 100;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; z-index: 100;
   }
   .nav-btn {
-    flex: 1;
-    padding: 10px 4px 8px;
+    flex: 1; padding: 10px 4px 8px;
     display: flex; flex-direction: column; align-items: center; gap: 3px;
     background: none; border: none; color: var(--text-dim);
     font-size: 10px; cursor: pointer; transition: color 0.15s;
@@ -88,40 +81,107 @@
   .page { display: none; padding: 16px; }
   .page.active { display: block; }
 
-  /* ── Search ── */
-  .search-box {
-    display: flex; gap: 8px; margin-bottom: 16px;
+  /* ── HOME PAGE ── */
+  .home-banner {
+    background: linear-gradient(135deg, #1a0505 0%, #0d0d14 60%, #0a0a1a 100%);
+    border: 1px solid #3a1a1a;
+    border-radius: 14px;
+    padding: 20px 16px;
+    margin-bottom: 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
   }
-  .search-input {
-    flex: 1;
-    background: var(--card);
-    border: 1px solid var(--border);
+  .home-banner::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(200,41,45,0.15) 0%, transparent 70%);
+  }
+  .home-banner-icon { font-size: 48px; margin-bottom: 8px; }
+  .home-banner-title {
+    font-size: 22px; font-weight: 800;
+    background: linear-gradient(135deg, #c89b3c, #e8c870);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+  .home-banner-sub { font-size: 13px; color: var(--text-dim); }
+
+  .home-search-box {
+    display: flex; gap: 8px; margin-bottom: 20px;
+  }
+
+  .home-sections {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-bottom: 20px;
+  }
+  .home-section-btn {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    cursor: pointer; transition: border-color 0.15s;
+    text-align: center;
+  }
+  .home-section-btn:active { border-color: var(--gold-dim); }
+  .home-section-btn .sec-icon { font-size: 26px; }
+  .home-section-btn .sec-name { font-size: 13px; font-weight: 600; }
+  .home-section-btn .sec-desc { font-size: 11px; color: var(--text-dim); }
+
+  .section-title {
+    font-size: 12px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.8px;
+    margin-bottom: 10px; margin-top: 4px;
+  }
+
+  /* Баннер DMarket */
+  .dmarket-banner {
+    background: linear-gradient(135deg, #0f1a2e, #1a2a3e);
+    border: 1px solid #1e3a5e;
     border-radius: var(--radius);
     padding: 12px 14px;
-    color: var(--text);
-    font-size: 15px;
-    outline: none;
-    transition: border-color 0.15s;
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer; text-decoration: none;
+  }
+  .dmarket-banner:active { opacity: 0.8; }
+  .dmarket-logo { font-size: 28px; }
+  .dmarket-text { flex: 1; }
+  .dmarket-title { font-size: 13px; font-weight: 700; color: #4a9eff; }
+  .dmarket-sub { font-size: 11px; color: var(--text-dim); }
+  .dmarket-arrow { color: var(--text-dim); font-size: 16px; }
+
+  /* Топ предметы */
+  .top-item {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 14px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; transition: border-color 0.15s;
+  }
+  .top-item:active { border-color: var(--gold-dim); }
+  .top-item-name { font-size: 13px; font-weight: 500; flex: 1; margin-right: 8px; }
+  .top-item-price { font-size: 14px; font-weight: 700; color: var(--gold); white-space: nowrap; }
+
+  /* ── Search ── */
+  .search-box { display: flex; gap: 8px; margin-bottom: 16px; }
+  .search-input {
+    flex: 1; background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px;
+    color: var(--text); font-size: 15px; outline: none; transition: border-color 0.15s;
   }
   .search-input:focus { border-color: var(--gold-dim); }
   .search-input::placeholder { color: var(--text-dim); }
   .search-btn {
-    background: var(--accent);
-    border: none; border-radius: var(--radius);
-    padding: 12px 18px; color: #fff;
-    font-size: 15px; cursor: pointer; font-weight: 600;
+    background: var(--accent); border: none; border-radius: var(--radius);
+    padding: 12px 18px; color: #fff; font-size: 15px; cursor: pointer; font-weight: 600;
     transition: opacity 0.15s;
   }
   .search-btn:active { opacity: 0.8; }
 
   .results-list { display: flex; flex-direction: column; gap: 8px; }
   .result-item {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 14px;
-    cursor: pointer;
-    transition: border-color 0.15s;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px;
+    cursor: pointer; transition: border-color 0.15s;
     display: flex; align-items: center; justify-content: space-between;
   }
   .result-item:active { border-color: var(--gold-dim); }
@@ -131,10 +191,8 @@
   /* ── Price Card ── */
   .price-card {
     background: linear-gradient(135deg, var(--card) 0%, #1a0f0f 100%);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px;
-    margin-bottom: 12px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px; margin-bottom: 12px;
   }
   .price-card-name { font-size: 15px; font-weight: 600; color: var(--gold); margin-bottom: 14px; line-height: 1.4; }
   .price-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -143,6 +201,7 @@
   .price-value.main { font-size: 24px; color: var(--gold); }
   .price-meta { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
   .price-actions { display: flex; gap: 8px; margin-top: 14px; }
+
   .btn {
     flex: 1; padding: 10px; border: none; border-radius: var(--radius);
     font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
@@ -151,32 +210,23 @@
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
   .btn-gold { background: var(--gold); color: #000; }
+  .btn-stars { background: linear-gradient(135deg, #5a3fa0, #7b5dc4); color: #fff; }
 
-  /* ── Empty / Loading states ── */
-  .empty-state {
-    text-align: center; padding: 40px 20px;
-    color: var(--text-dim); font-size: 14px;
-  }
+  /* ── Empty / Loading ── */
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-dim); font-size: 14px; }
   .empty-state .emoji { font-size: 40px; margin-bottom: 12px; }
   .loading { text-align: center; padding: 30px; color: var(--text-dim); }
   .spinner {
     display: inline-block; width: 24px; height: 24px;
-    border: 2px solid var(--border);
-    border-top-color: var(--gold);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    margin-bottom: 8px;
+    border: 2px solid var(--border); border-top-color: var(--gold);
+    border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 8px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Watchlist / Portfolio items ── */
+  /* ── Item Cards ── */
   .item-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px;
-    margin-bottom: 10px;
-    position: relative;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 10px;
   }
   .item-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
   .item-card-name { font-size: 14px; font-weight: 600; flex: 1; margin-right: 8px; line-height: 1.3; }
@@ -192,13 +242,27 @@
   .profit-negative { color: var(--red); }
   .threshold-below { color: var(--green); }
 
-  /* ── Portfolio summary ── */
+  /* Лимит-баннер */
+  .limit-banner {
+    background: linear-gradient(135deg, #1a0f00, #1e1a00);
+    border: 1px solid #3a2a00;
+    border-radius: var(--radius); padding: 12px 14px;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 10px;
+    cursor: pointer;
+  }
+  .limit-banner:active { opacity: 0.85; }
+  .limit-banner-text { flex: 1; font-size: 12px; color: #c8a040; line-height: 1.4; }
+  .limit-banner-btn {
+    background: var(--gold); color: #000; border: none;
+    border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 700;
+    white-space: nowrap; cursor: pointer;
+  }
+
+  /* ── Portfolio Summary ── */
   .portfolio-summary {
     background: linear-gradient(135deg, #1a0f0f 0%, var(--card) 100%);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    margin-bottom: 16px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 16px;
     display: flex; gap: 16px;
   }
   .summary-block { flex: 1; text-align: center; }
@@ -207,78 +271,59 @@
 
   /* ── FAB ── */
   .fab {
-    position: fixed;
-    bottom: 78px; right: 16px;
-    width: 52px; height: 52px;
-    background: var(--accent);
-    border: none; border-radius: 50%;
-    color: #fff; font-size: 26px;
+    position: fixed; bottom: 78px; right: 16px;
+    width: 52px; height: 52px; background: var(--accent);
+    border: none; border-radius: 50%; color: #fff; font-size: 26px;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; box-shadow: 0 4px 16px rgba(200,41,45,0.4);
-    transition: opacity 0.15s;
-    z-index: 90;
+    transition: opacity 0.15s; z-index: 90;
   }
   .fab:active { opacity: 0.8; }
   .fab.hidden { display: none; }
 
   /* ── Modal ── */
   .modal-overlay {
-    display: none;
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.7);
-    z-index: 200;
-    align-items: flex-end;
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); z-index: 200; align-items: flex-end;
   }
   .modal-overlay.open { display: flex; }
   .modal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px 16px 0 0;
-    padding: 20px 16px 32px;
-    width: 100%;
-    animation: slide-up 0.2s ease;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px 16px 0 0; padding: 20px 16px 32px;
+    width: 100%; animation: slide-up 0.2s ease;
   }
   @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
   .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; color: var(--gold); }
   .modal-input {
-    width: 100%;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 14px;
-    color: var(--text);
-    font-size: 15px;
-    outline: none;
-    margin-bottom: 12px;
+    width: 100%; background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px;
+    color: var(--text); font-size: 15px; outline: none; margin-bottom: 8px;
   }
   .modal-input:focus { border-color: var(--gold-dim); }
-  .modal-buttons { display: flex; gap: 8px; }
+  .modal-hint { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5; }
+  .modal-buttons { display: flex; gap: 8px; margin-top: 4px; }
 
-  /* ── Section title ── */
-  .section-title {
-    font-size: 12px; font-weight: 600; color: var(--text-dim);
-    text-transform: uppercase; letter-spacing: 0.8px;
-    margin-bottom: 10px; margin-top: 4px;
-  }
+  /* ── Premium Modal ── */
+  .premium-modal { text-align: center; }
+  .premium-modal .stars-icon { font-size: 52px; margin-bottom: 10px; }
+  .premium-modal .premium-title { font-size: 20px; font-weight: 800; color: var(--gold); margin-bottom: 8px; }
+  .premium-modal .premium-features { text-align: left; margin: 16px 0; }
+  .premium-feature { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; border-bottom: 1px solid var(--border); }
+  .premium-feature:last-child { border: none; }
+  .premium-feature .feat-icon { font-size: 20px; width: 28px; text-align: center; }
+  .premium-price { font-size: 24px; font-weight: 800; color: var(--gold); margin: 12px 0 4px; }
+  .premium-price-sub { font-size: 12px; color: var(--text-dim); margin-bottom: 16px; }
 
-  /* ── Graph page ── */
+  /* ── Chart ── */
   .graph-search { margin-bottom: 16px; }
-  .chart-container {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-  }
+  .chart-container { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
   .chart-title { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
 
-  /* ── Currency selector ── */
+  /* ── Currency ── */
   .currency-list { display: flex; flex-direction: column; gap: 8px; }
   .currency-option {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    cursor: pointer;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 16px; cursor: pointer;
     display: flex; align-items: center; justify-content: space-between;
     transition: border-color 0.15s;
   }
@@ -293,9 +338,8 @@
     position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%);
     background: var(--card); border: 1px solid var(--border);
     border-radius: 20px; padding: 8px 18px;
-    font-size: 13px; color: var(--text);
-    z-index: 300; opacity: 0; transition: opacity 0.2s;
-    white-space: nowrap;
+    font-size: 13px; color: var(--text); z-index: 300;
+    opacity: 0; transition: opacity 0.2s; white-space: nowrap;
   }
   .toast.show { opacity: 1; }
 </style>
@@ -304,13 +348,72 @@
 
 <!-- Header -->
 <div class="header">
-  <div class="header-logo">🎮</div>
-  <div class="header-title">Dota 2 Prices</div>
-  <div class="currency-badge" onclick="openCurrencyModal()" id="currencyBadge">RUB</div>
+  <span class="header-logo">🎮</span>
+  <span class="header-title">Dota 2 Prices</span>
+  <div class="header-right">
+    <span class="premium-badge" id="premiumBadge">⭐ PRO</span>
+    <div class="currency-badge" onclick="openCurrencyModal()" id="currencyBadge">RUB</div>
+  </div>
 </div>
 
 <!-- Pages -->
-<div id="page-search" class="page active">
+<div id="page-home" class="page active">
+  <!-- Баннер -->
+  <div class="home-banner">
+    <div class="home-banner-icon">🛡️</div>
+    <div class="home-banner-title">Dota 2 Price Tracker</div>
+    <div class="home-banner-sub">Цены Steam Market в реальном времени</div>
+  </div>
+
+  <!-- Быстрый поиск -->
+  <div class="home-search-box">
+    <input class="search-input" id="homeSearchInput" placeholder="Быстрый поиск предмета..."
+      autocomplete="off" onkeydown="if(event.key==='Enter') doHomeSearch()">
+    <button class="search-btn" onclick="doHomeSearch()">🔍</button>
+  </div>
+
+  <!-- Разделы -->
+  <div class="home-sections">
+    <div class="home-section-btn" onclick="switchPage('search', document.querySelectorAll('.nav-btn')[1])">
+      <span class="sec-icon">🔍</span>
+      <span class="sec-name">Поиск</span>
+      <span class="sec-desc">Найти предмет</span>
+    </div>
+    <div class="home-section-btn" onclick="switchPage('watchlist', document.querySelectorAll('.nav-btn')[2])">
+      <span class="sec-icon">⭐</span>
+      <span class="sec-name">Вотчлист</span>
+      <span class="sec-desc">Отслеживание цен</span>
+    </div>
+    <div class="home-section-btn" onclick="switchPage('portfolio', document.querySelectorAll('.nav-btn')[3])">
+      <span class="sec-icon">💼</span>
+      <span class="sec-name">Портфель</span>
+      <span class="sec-desc">Мои инвестиции</span>
+    </div>
+    <div class="home-section-btn" onclick="switchPage('chart', document.querySelectorAll('.nav-btn')[4])">
+      <span class="sec-icon">📈</span>
+      <span class="sec-name">Графики</span>
+      <span class="sec-desc">История цен</span>
+    </div>
+  </div>
+
+  <!-- DMarket баннер -->
+  <a class="dmarket-banner" href="https://dmarket.com/ingame-items/item-list/dota2-skins" target="_blank">
+    <span class="dmarket-logo">💎</span>
+    <div class="dmarket-text">
+      <div class="dmarket-title">Торгуй на DMarket</div>
+      <div class="dmarket-sub">Купи и продай предметы Dota 2 выгодно</div>
+    </div>
+    <span class="dmarket-arrow">›</span>
+  </a>
+
+  <!-- Топ предметы -->
+  <div class="section-title">🔥 Популярные предметы</div>
+  <div id="topItemsList">
+    <div class="loading"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<div id="page-search" class="page">
   <div class="search-box">
     <input class="search-input" id="searchInput" placeholder="Название предмета..." autocomplete="off"
       onkeydown="if(event.key==='Enter') doSearch()">
@@ -346,7 +449,10 @@
 
 <!-- Nav -->
 <nav class="nav">
-  <button class="nav-btn active" data-page="search" onclick="switchPage('search', this)">
+  <button class="nav-btn active" data-page="home" onclick="switchPage('home', this)">
+    <span class="icon">🏠</span>Главная
+  </button>
+  <button class="nav-btn" data-page="search" onclick="switchPage('search', this)">
     <span class="icon">🔍</span>Поиск
   </button>
   <button class="nav-btn" data-page="watchlist" onclick="switchPage('watchlist', this)">
@@ -363,7 +469,7 @@
 <!-- FAB -->
 <button class="fab hidden" id="fab" onclick="openAddModal()">＋</button>
 
-<!-- Add modal (watchlist / portfolio) -->
+<!-- Add modal -->
 <div class="modal-overlay" id="addModal">
   <div class="modal">
     <div class="modal-title" id="addModalTitle">Добавить в вотчлист</div>
@@ -373,8 +479,9 @@
       <div id="addModalResults"></div>
     </div>
     <div id="addModalForm" style="display:none">
-      <div style="font-size:14px; margin-bottom:12px; color:var(--gold)" id="addModalItemName"></div>
+      <div style="font-size:14px; margin-bottom:10px; color:var(--gold); font-weight:600" id="addModalItemName"></div>
       <input class="modal-input" id="addModalValue" type="number" step="0.01" min="0">
+      <div class="modal-hint" id="addModalHint"></div>
       <div class="modal-buttons">
         <button class="btn btn-secondary" onclick="closeAddModal()">Отмена</button>
         <button class="btn btn-primary" onclick="submitAdd()">Добавить</button>
@@ -398,6 +505,26 @@
   </div>
 </div>
 
+<!-- Premium modal -->
+<div class="modal-overlay" id="premiumModal">
+  <div class="modal premium-modal">
+    <div class="stars-icon">⭐</div>
+    <div class="premium-title">Dota 2 Tracker Premium</div>
+    <div class="premium-features">
+      <div class="premium-feature"><span class="feat-icon">♾️</span> Безлимитный вотчлист</div>
+      <div class="premium-feature"><span class="feat-icon">💼</span> Безлимитный портфель</div>
+      <div class="premium-feature"><span class="feat-icon">🚫</span> Без рекламы</div>
+      <div class="premium-feature"><span class="feat-icon">⚡</span> Приоритетная поддержка</div>
+    </div>
+    <div class="premium-price">200 ⭐</div>
+    <div class="premium-price-sub">Telegram Stars · Разовая оплата</div>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closePremiumModal()">Закрыть</button>
+      <button class="btn btn-stars" onclick="buyPremium()">⭐ Купить Premium</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -406,18 +533,17 @@
 
 const tg = window.Telegram.WebApp;
 tg.expand();
-tg.enableClosingConfirmation();
 
-// API base — замени на свой домен после деплоя
 const API_BASE = "https://exclusive-consoling-heavily.ngrok-free.dev";
 
 let initData = tg.initData;
 let currentCurrency = "RUB";
 let currentSymbol = "руб.";
-let currentPage = "search";
-let addModalMode = "watchlist"; // or "portfolio"
+let currentPage = "home";
+let addModalMode = "watchlist";
 let addModalSelectedItem = null;
 let chartInstance = null;
+let userIsPremium = false;
 
 function apiUrl(path) {
   const sep = path.includes("?") ? "&" : "?";
@@ -453,9 +579,17 @@ async function init() {
     currentSymbol = me.currency_symbol;
     document.getElementById("currencyBadge").textContent = currentCurrency;
     renderCurrencyList(me.currencies);
+
+    // Проверяем премиум
+    const prem = await apiFetch("/api/premium");
+    userIsPremium = prem.premium;
+    if (userIsPremium) {
+      document.getElementById("premiumBadge").classList.add("show");
+    }
+
+    loadTopItems();
   } catch (e) {
-    showToast("❌ " + (e.message || "Ошибка подключения к серверу"));
-    console.error("init error:", e);
+    showToast("❌ " + (e.message || "Ошибка подключения"));
   }
 }
 
@@ -465,7 +599,7 @@ function switchPage(page, btn) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
   document.getElementById("page-" + page).classList.add("active");
-  btn.classList.add("active");
+  if (btn) btn.classList.add("active");
   currentPage = page;
 
   const fab = document.getElementById("fab");
@@ -480,7 +614,41 @@ function switchPage(page, btn) {
   if (page === "portfolio") loadPortfolio();
 }
 
-// ── Search page ───────────────────────────────────────────────────────────────
+// ── Home page ─────────────────────────────────────────────────────────────────
+
+async function loadTopItems() {
+  const container = document.getElementById("topItemsList");
+  try {
+    const data = await apiFetch("/api/top-items");
+    if (!data.items.length) {
+      container.innerHTML = `<div style="color:var(--text-dim);font-size:13px">Нет данных</div>`;
+      return;
+    }
+    container.innerHTML = data.items.map(item => `
+      <div class="top-item" onclick="goToItemPrice('${item.item_name.replace(/'/g,"\\'")}')">
+        <span class="top-item-name">${item.item_name}</span>
+        <span class="top-item-price">${fmt(item.lowest)} ${item.symbol}</span>
+      </div>`).join("");
+  } catch (e) {
+    container.innerHTML = `<div style="color:var(--text-dim);font-size:13px">Не удалось загрузить топ</div>`;
+  }
+}
+
+function doHomeSearch() {
+  const q = document.getElementById("homeSearchInput").value.trim();
+  if (!q) return;
+  // Переключаем на вкладку поиска и выполняем поиск
+  document.getElementById("searchInput").value = q;
+  switchPage("search", document.querySelectorAll(".nav-btn")[1]);
+  doSearch();
+}
+
+function goToItemPrice(itemName) {
+  switchPage("search", document.querySelectorAll(".nav-btn")[1]);
+  showItemPrice(itemName);
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
 
 async function doSearch() {
   const q = document.getElementById("searchInput").value.trim();
@@ -505,8 +673,7 @@ async function doSearch() {
     container.innerHTML = `<div class="section-title">Результаты поиска</div><div class="results-list">` +
       data.results.map(name =>
         `<div class="result-item" onclick="showItemPrice('${name.replace(/'/g,"\\'")}')">
-          <span class="result-name">${name}</span>
-          <span class="result-arrow">›</span>
+          <span class="result-name">${name}</span><span class="result-arrow">›</span>
         </div>`
       ).join("") + `</div>`;
   } catch (e) {
@@ -534,7 +701,7 @@ async function showItemPrice(itemName) {
         ${data.volume ? `<div class="price-meta">📦 Продано за 24ч: ${data.volume}</div>` : ""}
         <div class="price-actions">
           <button class="btn btn-secondary" onclick="doSearch()">◀ Назад</button>
-          <button class="btn btn-secondary" onclick="addToWatchlistQuick('${itemName.replace(/'/g,"\\'")}')">⭐ Вотчлист</button>
+          <button class="btn btn-secondary" onclick="addToWatchlistQuick('${itemName.replace(/'/g,"\\'")}')">⭐</button>
           <button class="btn btn-gold" onclick="addToPortfolioQuick('${itemName.replace(/'/g,"\\'")}', ${data.lowest})">💼 Портфель</button>
         </div>
       </div>`;
@@ -547,24 +714,38 @@ async function showItemPrice(itemName) {
 
 async function loadWatchlist() {
   const container = document.getElementById("watchlistContent");
-  container.innerHTML = `<div class="loading"><div class="spinner"></div><div>Загружаю...</div></div>`;
+  container.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
   try {
     const data = await apiFetch("/api/watchlist");
-    if (!data.items.length) {
-      container.innerHTML = `<div class="empty-state"><div class="emoji">⭐</div><div>Вотчлист пуст</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>`;
-      return;
+
+    let html = "";
+    if (!userIsPremium) {
+      const used = data.items.length;
+      const limit = 3;
+      if (used >= limit) {
+        html += `<div class="limit-banner" onclick="openPremiumModal()">
+          <span style="font-size:22px">🔒</span>
+          <div class="limit-banner-text">Использовано ${used}/${limit} мест. Оформи Premium для безлимитного вотчлиста.</div>
+          <button class="limit-banner-btn">⭐ PRO</button>
+        </div>`;
+      } else {
+        html += `<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Использовано ${used}/${limit} мест · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">Получить безлимит ⭐</span></div>`;
+      }
     }
-    container.innerHTML = data.items.map(item => {
-      const belowThreshold = item.threshold > 0 && item.current_price && item.current_price <= item.threshold;
-      return `
-        <div class="item-card">
+
+    if (!data.items.length) {
+      html += `<div class="empty-state"><div class="emoji">⭐</div><div>Вотчлист пуст</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>`;
+    } else {
+      html += data.items.map(item => {
+        const belowThreshold = item.threshold > 0 && item.current_price && item.current_price <= item.threshold;
+        return `<div class="item-card">
           <div class="item-card-header">
             <div class="item-card-name">${item.item_name}</div>
             <button class="item-card-delete" onclick="deleteWatchlistItem(${item.id})">×</button>
           </div>
           <div class="item-card-row">
             <span class="item-card-label">Текущая цена</span>
-            <span class="item-card-value ${belowThreshold ? 'threshold-below' : ''}">
+            <span class="item-card-value ${belowThreshold ? "threshold-below" : ""}">
               ${item.current_price ? fmt(item.current_price) + " " + item.symbol : "—"}
             </span>
           </div>
@@ -574,7 +755,9 @@ async function loadWatchlist() {
           </div>
           ${belowThreshold ? `<div style="font-size:12px;color:var(--green);margin-top:6px">✅ Цена достигла порога!</div>` : ""}
         </div>`;
-    }).join("");
+      }).join("");
+    }
+    container.innerHTML = html;
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
   }
@@ -592,19 +775,32 @@ async function deleteWatchlistItem(id) {
 
 async function loadPortfolio() {
   const container = document.getElementById("portfolioContent");
-  container.innerHTML = `<div class="loading"><div class="spinner"></div><div>Загружаю...</div></div>`;
+  container.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
   try {
     const data = await apiFetch("/api/portfolio");
-    if (!data.items.length) {
-      container.innerHTML = `<div class="empty-state"><div class="emoji">💼</div><div>Портфель пуст</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>`;
-      return;
-    }
-    const totalProfit = data.total_profit;
-    const profitClass = totalProfit >= 0 ? "profit-positive" : "profit-negative";
-    const profitSign = totalProfit >= 0 ? "+" : "";
 
-    let html = `
-      <div class="portfolio-summary">
+    let html = "";
+    if (!userIsPremium) {
+      const used = data.items.length;
+      const limit = 5;
+      if (used >= limit) {
+        html += `<div class="limit-banner" onclick="openPremiumModal()">
+          <span style="font-size:22px">🔒</span>
+          <div class="limit-banner-text">Использовано ${used}/${limit} мест. Оформи Premium для безлимитного портфеля.</div>
+          <button class="limit-banner-btn">⭐ PRO</button>
+        </div>`;
+      } else {
+        html += `<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Использовано ${used}/${limit} мест · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">Получить безлимит ⭐</span></div>`;
+      }
+    }
+
+    if (!data.items.length) {
+      html += `<div class="empty-state"><div class="emoji">💼</div><div>Портфель пуст</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>`;
+    } else {
+      const totalProfit = data.total_profit;
+      const profitClass = totalProfit >= 0 ? "profit-positive" : "profit-negative";
+      const profitSign = totalProfit >= 0 ? "+" : "";
+      html += `<div class="portfolio-summary">
         <div class="summary-block">
           <div class="summary-label">Вложено</div>
           <div class="summary-value">${fmt(data.total_buy)} ${data.symbol}</div>
@@ -615,15 +811,13 @@ async function loadPortfolio() {
         </div>
         <div class="summary-block">
           <div class="summary-label">Прибыль</div>
-          <div class="summary-value ${profitClass}">${totalProfit != null ? profitSign + fmt(totalProfit) + " " + data.symbol : "—"}</div>
+          <div class="summary-value ${profitClass}">${totalProfit != null ? profitSign + fmt(totalProfit) : "—"}</div>
         </div>
       </div>`;
-
-    html += data.items.map(item => {
-      const profitClass = item.profit >= 0 ? "profit-positive" : "profit-negative";
-      const sign = item.profit >= 0 ? "+" : "";
-      return `
-        <div class="item-card">
+      html += data.items.map(item => {
+        const pc = item.profit >= 0 ? "profit-positive" : "profit-negative";
+        const s = item.profit >= 0 ? "+" : "";
+        return `<div class="item-card">
           <div class="item-card-header">
             <div class="item-card-name">${item.item_name}</div>
             <button class="item-card-delete" onclick="deletePortfolioItem(${item.id})">×</button>
@@ -636,14 +830,13 @@ async function loadPortfolio() {
             <span class="item-card-label">Сейчас</span>
             <span class="item-card-value">${item.current_price ? fmt(item.current_price) + " " + item.symbol : "—"}</span>
           </div>
-          ${item.profit != null ? `
-          <div class="item-card-row">
+          ${item.profit != null ? `<div class="item-card-row">
             <span class="item-card-label">Прибыль</span>
-            <span class="item-card-value ${profitClass}">${sign}${fmt(item.profit)} ${item.symbol} (${sign}${item.profit_pct.toFixed(1)}%)</span>
+            <span class="item-card-value ${pc}">${s}${fmt(item.profit)} ${item.symbol} (${s}${item.profit_pct.toFixed(1)}%)</span>
           </div>` : ""}
         </div>`;
-    }).join("");
-
+      }).join("");
+    }
     container.innerHTML = html;
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
@@ -658,7 +851,7 @@ async function deletePortfolioItem(id) {
   } catch (e) { showToast(e.message); }
 }
 
-// ── Chart page ────────────────────────────────────────────────────────────────
+// ── Chart ─────────────────────────────────────────────────────────────────────
 
 async function doChartSearch() {
   const q = document.getElementById("chartSearchInput").value.trim();
@@ -694,30 +887,22 @@ async function loadChart(itemName) {
       container.innerHTML = `<div class="empty-state"><div class="emoji">📈</div><div>История пока пуста</div><div style="font-size:12px;margin-top:6px">Данные накапливаются при каждом запросе цены</div></div>`;
       return;
     }
-
     const labels = data.history.map(h => {
       const d = new Date(h.date);
       return `${d.getDate()}.${String(d.getMonth()+1).padStart(2,"0")}`;
     });
     const prices = data.history.map(h => h.price);
-
     if (chartInstance) chartInstance.destroy();
-
     const ctx = document.getElementById("priceChart").getContext("2d");
     chartInstance = new Chart(ctx, {
       type: "line",
       data: {
         labels,
         datasets: [{
-          label: "Цена",
-          data: prices,
-          borderColor: "#c89b3c",
-          backgroundColor: "rgba(200,155,60,0.1)",
-          borderWidth: 2,
-          pointRadius: 3,
-          pointBackgroundColor: "#c89b3c",
-          fill: true,
-          tension: 0.3,
+          label: "Цена", data: prices,
+          borderColor: "#c89b3c", backgroundColor: "rgba(200,155,60,0.1)",
+          borderWidth: 2, pointRadius: 3, pointBackgroundColor: "#c89b3c",
+          fill: true, tension: 0.3,
         }]
       },
       options: {
@@ -740,8 +925,6 @@ function openAddModal() {
   addModalSelectedItem = null;
   document.getElementById("addModalTitle").textContent =
     addModalMode === "watchlist" ? "Добавить в вотчлист" : "Добавить в портфель";
-  document.getElementById("addModalValue").placeholder =
-    addModalMode === "watchlist" ? "Порог цены (0 = без порога)" : "Цена покупки";
   document.getElementById("addModalSearch").value = "";
   document.getElementById("addModalResults").innerHTML = "";
   document.getElementById("addModalSearchBox").style.display = "block";
@@ -783,6 +966,17 @@ function selectModalItem(itemName) {
   document.getElementById("addModalSearchButtons").style.display = "none";
   document.getElementById("addModalItemName").textContent = itemName;
   document.getElementById("addModalValue").value = "";
+
+  if (addModalMode === "watchlist") {
+    document.getElementById("addModalValue").placeholder = "Например: 500";
+    document.getElementById("addModalHint").textContent =
+      "Укажи порог цены — получишь уведомление когда предмет подешевеет до этой суммы. Введи 0 если хочешь просто отслеживать без уведомлений.";
+  } else {
+    document.getElementById("addModalValue").placeholder = "Например: 1200.50";
+    document.getElementById("addModalHint").textContent =
+      "Укажи цену за которую ты купил этот предмет — бот будет считать твою прибыль или убыток относительно текущей рыночной цены.";
+  }
+
   document.getElementById("addModalForm").style.display = "block";
   setTimeout(() => document.getElementById("addModalValue").focus(), 100);
 }
@@ -810,24 +1004,40 @@ async function submitAdd() {
       closeAddModal();
       loadPortfolio();
     }
-  } catch (e) { showToast(e.message); }
+  } catch (e) {
+    if (e.message.includes("Premium") || e.message.includes("Бесплатный")) {
+      closeAddModal();
+      openPremiumModal();
+    } else {
+      showToast(e.message);
+    }
+  }
 }
 
 function addToWatchlistQuick(itemName) {
   addModalMode = "watchlist";
-  selectModalItem(itemName);
-  document.getElementById("addModalTitle").textContent = "Добавить в вотчлист";
-  document.getElementById("addModalValue").placeholder = "Порог цены (0 = без порога)";
-  document.getElementById("addModal").classList.add("open");
+  openAddModal();
+  setTimeout(() => selectModalItem(itemName), 50);
 }
 
 function addToPortfolioQuick(itemName, price) {
   addModalMode = "portfolio";
-  selectModalItem(itemName);
-  document.getElementById("addModalTitle").textContent = "Добавить в портфель";
-  document.getElementById("addModalValue").placeholder = "Цена покупки";
-  document.getElementById("addModalValue").value = price;
-  document.getElementById("addModal").classList.add("open");
+  openAddModal();
+  setTimeout(() => {
+    selectModalItem(itemName);
+    setTimeout(() => { document.getElementById("addModalValue").value = price; }, 50);
+  }, 50);
+}
+
+// ── Premium ───────────────────────────────────────────────────────────────────
+
+function openPremiumModal() { document.getElementById("premiumModal").classList.add("open"); }
+function closePremiumModal() { document.getElementById("premiumModal").classList.remove("open"); }
+
+function buyPremium() {
+  closePremiumModal();
+  // Открываем бота для оплаты через Stars
+  tg.openTelegramLink("https://t.me/Dota2PriceBot?start=premium");
 }
 
 // ── Currency ──────────────────────────────────────────────────────────────────
@@ -868,11 +1078,10 @@ function openCurrencyModal() { document.getElementById("currencyModal").classLis
 function closeCurrencyModal() { document.getElementById("currencyModal").classList.remove("open"); }
 
 // Закрытие модалок по клику на overlay
-document.getElementById("addModal").addEventListener("click", function(e) {
-  if (e.target === this) closeAddModal();
-});
-document.getElementById("currencyModal").addEventListener("click", function(e) {
-  if (e.target === this) closeCurrencyModal();
+["addModal","currencyModal","premiumModal"].forEach(id => {
+  document.getElementById(id).addEventListener("click", function(e) {
+    if (e.target === this) this.classList.remove("open");
+  });
 });
 
 // ── Utils ─────────────────────────────────────────────────────────────────────

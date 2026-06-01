@@ -18,6 +18,8 @@ from config import BOT_TOKEN
 from database import (
     get_user_settings,
     set_user_currency,
+    is_premium,
+    set_premium,
     add_to_watchlist,
     get_watchlist,
     remove_from_watchlist,
@@ -30,6 +32,24 @@ from database import (
     touch_activity,
 )
 from skin_checker import get_item_price, search_items, CURRENCIES
+
+# Лимиты для бесплатных пользователей
+FREE_WATCHLIST_LIMIT = 3
+FREE_PORTFOLIO_LIMIT = 5
+
+# Топ популярных предметов Dota 2
+TOP_ITEMS = [
+    "Dragonclaw Hook",
+    "Genuine Dragonclaw Hook",
+    "Tempest Helm of the Thundergod",
+    "Arcana",
+    "Demon Edge (Unusual)",
+    "Inscribed Corrupted Monarch Bow",
+    "Inscribed Blades of the Reaper",
+    "Sylvan Cascade",
+    "Frostivus Treant",
+    "Genuine Resonant Virtue",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +115,10 @@ def get_current_user(init_data: str = Query(..., alias="initData")) -> dict:
 class WatchlistAddRequest(BaseModel):
     item_name: str
     threshold: float = 0.0
+
+
+class PremiumActivateRequest(BaseModel):
+    telegram_payment_charge_id: str
 
 
 class WatchlistUpdateRequest(BaseModel):
@@ -184,9 +208,17 @@ def get_watchlist_api(user: dict = Depends(get_current_user)):
 
 @app.post("/api/watchlist")
 def add_watchlist_api(body: WatchlistAddRequest, user: dict = Depends(get_current_user)):
-    added = add_to_watchlist(user["id"], body.item_name, body.threshold)
+    user_id = user["id"]
+    if not is_premium(user_id):
+        current = get_watchlist(user_id)
+        if len(current) >= FREE_WATCHLIST_LIMIT:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Бесплатный план — максимум {FREE_WATCHLIST_LIMIT} предмета в вотчлисте. Оформи Premium для безлимитного доступа."
+            )
+    added = add_to_watchlist(user_id, body.item_name, body.threshold)
     if not added:
-        raise HTTPException(status_code=409, detail="Item already in watchlist")
+        raise HTTPException(status_code=409, detail="Предмет уже есть в вотчлисте")
     return {"ok": True}
 
 
@@ -251,7 +283,15 @@ def get_portfolio_api(user: dict = Depends(get_current_user)):
 
 @app.post("/api/portfolio")
 def add_portfolio_api(body: PortfolioAddRequest, user: dict = Depends(get_current_user)):
-    add_to_portfolio(user["id"], body.item_name, body.buy_price)
+    user_id = user["id"]
+    if not is_premium(user_id):
+        current = get_portfolio(user_id)
+        if len(current) >= FREE_PORTFOLIO_LIMIT:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Бесплатный план — максимум {FREE_PORTFOLIO_LIMIT} предметов в портфеле. Оформи Premium для безлимитного доступа."
+            )
+    add_to_portfolio(user_id, body.item_name, body.buy_price)
     return {"ok": True}
 
 
@@ -273,6 +313,37 @@ def get_history(item: str = Query(...), user: dict = Depends(get_current_user)):
             {"price": h["price"], "date": h["recorded_at"]}
             for h in reversed(history)
         ],
+    }
+
+
+@app.get("/api/top-items")
+def get_top_items(user: dict = Depends(get_current_user)):
+    """Топ популярных предметов с текущими ценами."""
+    settings = get_user_settings(user["id"])
+    currency = settings.get("currency", "RUB")
+    symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
+
+    result = []
+    for item_name in TOP_ITEMS[:6]:  # первые 6 для главного экрана
+        price_data = get_item_price(item_name, currency)
+        if price_data and price_data["lowest"] > 0:
+            result.append({
+                "item_name": item_name,
+                "lowest": price_data["lowest"],
+                "symbol": symbol,
+            })
+    return {"items": result}
+
+
+@app.get("/api/premium")
+def get_premium_status(user: dict = Depends(get_current_user)):
+    """Статус премиума пользователя."""
+    user_id = user["id"]
+    premium = is_premium(user_id)
+    return {
+        "premium": premium,
+        "watchlist_limit": None if premium else FREE_WATCHLIST_LIMIT,
+        "portfolio_limit": None if premium else FREE_PORTFOLIO_LIMIT,
     }
 
 
