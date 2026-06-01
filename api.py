@@ -31,6 +31,7 @@ from database import (
     record_price,
     get_price_history,
     touch_activity,
+    log_event,
     get_price_checks_this_week,
     log_user_price_check,
     get_bonus_watchlist,
@@ -361,6 +362,7 @@ def ad_reward(body: AdRewardRequest, user: dict = Depends(get_current_user)):
 
     if body.reward_type == "price_checks":
         add_bonus_price_checks(user_id, AD_REWARD_PRICE_CHECKS)
+        log_event("ad_reward_price_checks")      # для статистики
         bonus = get_bonus_price_checks(user_id)
         limit = FREE_WEEKLY_PRICE_CHECKS + bonus
         checks = get_price_checks_this_week(user_id)
@@ -373,6 +375,7 @@ def ad_reward(body: AdRewardRequest, user: dict = Depends(get_current_user)):
         }
     elif body.reward_type == "watchlist":
         added = add_bonus_watchlist_slot(user_id)
+        log_event("ad_reward_watchlist")         # для статистики
         bonus = get_bonus_watchlist(user_id)
         if not added:
             raise HTTPException(

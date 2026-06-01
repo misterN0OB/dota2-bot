@@ -392,3 +392,79 @@ def add_bonus_watchlist_slot(user_id: int) -> bool:
 def get_bonus_watchlist(user_id: int) -> int:
     settings = get_user_settings(user_id)
     return settings.get("bonus_watchlist", 0)
+
+
+# ── analytics / admin stats ───────────────────────────────────────────────────
+
+def get_total_users() -> int:
+    """Всего уникальных пользователей."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT COUNT(*) as cnt FROM user_activity").fetchone()
+        return row["cnt"] if row else 0
+
+
+def get_new_users_count(days: int = 1) -> int:
+    """Новые пользователи за последние N дней (по событию start)."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM daily_events "
+            "WHERE event_type = 'start' AND created_at >= datetime('now', ?)",
+            (f"-{days} days",)
+        ).fetchone()
+        return row["cnt"] if row else 0
+
+
+def get_active_users_count(hours: int = 24) -> int:
+    """Активные пользователи за последние N часов."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM user_activity "
+            "WHERE last_seen >= datetime('now', ?)",
+            (f"-{hours} hours",)
+        ).fetchone()
+        return row["cnt"] if row else 0
+
+
+def get_premium_count() -> int:
+    """Количество Premium пользователей."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM user_settings WHERE premium = 1"
+        ).fetchone()
+        return row["cnt"] if row else 0
+
+
+def get_event_count_days(event_type: str, days: int = 1) -> int:
+    """Количество событий за последние N дней."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM daily_events "
+            "WHERE event_type = ? AND created_at >= datetime('now', ?)",
+            (event_type, f"-{days} days")
+        ).fetchone()
+        return row["cnt"] if row else 0
+
+
+def get_total_price_checks(days: int = 1) -> int:
+    """Всего проверок цены за последние N дней (по всем пользователям)."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM daily_events "
+            "WHERE event_type LIKE 'pc_%' AND created_at >= datetime('now', ?)",
+            (f"-{days} days",)
+        ).fetchone()
+        return row["cnt"] if row else 0
+
+
+def get_watchlist_total() -> int:
+    """Всего предметов во всех вотчлистах."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT COUNT(*) as cnt FROM watchlist").fetchone()
+        return row["cnt"] if row else 0
+
+
+def get_portfolio_total() -> int:
+    """Всего предметов во всех портфелях."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT COUNT(*) as cnt FROM portfolio").fetchone()
+        return row["cnt"] if row else 0

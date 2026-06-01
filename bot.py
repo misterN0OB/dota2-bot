@@ -36,6 +36,14 @@ from database import (
     touch_activity,
     log_event,
     add_referral,
+    get_total_users,
+    get_new_users_count,
+    get_active_users_count,
+    get_premium_count,
+    get_event_count_days,
+    get_total_price_checks,
+    get_watchlist_total,
+    get_portfolio_total,
 )
 from skin_checker import (
     search_items,
@@ -526,6 +534,72 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
 
+def build_stats_text() -> str:
+    """Формирует текст со статистикой для администратора."""
+    total      = get_total_users()
+    new_today  = get_new_users_count(days=1)
+    new_week   = get_new_users_count(days=7)
+    active_24h = get_active_users_count(hours=24)
+    active_7d  = get_active_users_count(hours=168)
+    premium    = get_premium_count()
+
+    checks_today = get_total_price_checks(days=1)
+    checks_week  = get_total_price_checks(days=7)
+
+    ad_checks_today = get_event_count_days("ad_reward_price_checks", days=1)
+    ad_checks_week  = get_event_count_days("ad_reward_price_checks", days=7)
+    ad_wl_today     = get_event_count_days("ad_reward_watchlist",    days=1)
+    ad_wl_week      = get_event_count_days("ad_reward_watchlist",    days=7)
+
+    prem_today = get_event_count_days("premium_purchase", days=1)
+    prem_week  = get_event_count_days("premium_purchase", days=7)
+    prem_month = get_event_count_days("premium_purchase", days=30)
+
+    wl_total   = get_watchlist_total()
+    port_total = get_portfolio_total()
+
+    return (
+        f"📊 <b>Статистика Dota 2 Price Bot</b>\n"
+        f"{'─' * 28}\n\n"
+        f"👥 <b>Пользователи</b>\n"
+        f"  Всего: <b>{total}</b>\n"
+        f"  Новых сегодня: <b>{new_today}</b>\n"
+        f"  Новых за неделю: <b>{new_week}</b>\n"
+        f"  Активны за 24ч: <b>{active_24h}</b>\n"
+        f"  Активны за 7д: <b>{active_7d}</b>\n"
+        f"  Premium: <b>{premium}</b>\n\n"
+        f"⭐ <b>Покупки Premium</b>\n"
+        f"  Сегодня: <b>{prem_today}</b>\n"
+        f"  За неделю: <b>{prem_week}</b>\n"
+        f"  За месяц: <b>{prem_month}</b>\n\n"
+        f"📺 <b>Просмотры рекламы</b>\n"
+        f"  Проверки цен — сегодня: <b>{ad_checks_today}</b> / неделя: <b>{ad_checks_week}</b>\n"
+        f"  Слоты вотчлиста — сегодня: <b>{ad_wl_today}</b> / неделя: <b>{ad_wl_week}</b>\n\n"
+        f"🔍 <b>Проверки цены</b>\n"
+        f"  Сегодня: <b>{checks_today}</b>\n"
+        f"  За неделю: <b>{checks_week}</b>\n\n"
+        f"⭐ <b>Вотчлист</b>: {wl_total} предметов\n"
+        f"💼 <b>Портфели</b>: {port_total} предметов"
+    )
+
+
+async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Статистика — только для администратора."""
+    if update.effective_user.id != ADMIN_ID:
+        return  # молча игнорируем для остальных
+    text = build_stats_text()
+    await update.message.reply_text(text, parse_mode="HTML")
+
+
+async def send_daily_digest(context):
+    """Ежедневный дайджест статистики — отправляется в 9:00 UTC."""
+    text = "🌅 <b>Ежедневный отчёт</b>\n\n" + build_stats_text()
+    try:
+        await context.bot.send_message(chat_id=ADMIN_ID, text=text, parse_mode="HTML")
+    except Exception as e:
+        logger.warning("Failed to send daily digest: %s", e)
+
+
 async def unknown_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Выбери действие из меню 👇",
@@ -613,15 +687,18 @@ def main():
     app.add_handler(MessageHandler(filters.Regex("^👥 Пригласить$"), share_referral))
     app.add_handler(CommandHandler("share", share_referral))
     app.add_handler(CommandHandler("premium", cmd_premium))
+    app.add_handler(CommandHandler("stats", cmd_stats))   # только для админа
     app.add_handler(PreCheckoutQueryHandler(pre_checkout))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
 
     # Fallback
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unknown_message))
 
-    # Фоновая проверка вотчлиста каждые 30 минут
+    # Фоновые задачи
     job_queue = app.job_queue
     job_queue.run_repeating(check_watchlist, interval=1800, first=60)
+    # Ежедневный дайджест статистики в 9:00 UTC
+    job_queue.run_daily(send_daily_digest, time=__import__("datetime").time(11, 0, 0))
 
     logger.info("Бот запущен.")
     app.run_polling(drop_pending_updates=True)
