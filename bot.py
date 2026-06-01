@@ -470,6 +470,16 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
+    # Общий fallback — любая кнопка главного меню завершает диалог
+    menu_fallbacks = [
+        CommandHandler("cancel", price_cancel),
+        CommandHandler("start", cmd_start),
+        MessageHandler(filters.Regex("^🔍 Проверить цену$"), price_start),
+        MessageHandler(filters.Regex("^⭐ Мой вотчлист$"), watchlist_menu),
+        MessageHandler(filters.Regex("^⚙️ Настройки$"), settings_menu),
+        MessageHandler(filters.Regex("^👥 Пригласить$"), share_referral),
+    ]
+
     # ConversationHandler: Проверить цену
     price_conv = ConversationHandler(
         entry_points=[
@@ -484,10 +494,7 @@ def main():
                 CallbackQueryHandler(price_select_item, pattern=r"^price:"),
             ],
         },
-        fallbacks=[
-            CommandHandler("cancel", price_cancel),
-            MessageHandler(filters.Regex("^❌"), price_cancel),
-        ],
+        fallbacks=menu_fallbacks,
         per_message=False,
     )
 
@@ -507,9 +514,7 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, watch_enter_threshold)
             ],
         },
-        fallbacks=[
-            CommandHandler("cancel", price_cancel),
-        ],
+        fallbacks=menu_fallbacks,
         per_message=False,
     )
 

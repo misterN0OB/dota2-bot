@@ -26,7 +26,8 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
                 item_name TEXT,
-                threshold REAL
+                threshold REAL,
+                last_notified TEXT DEFAULT NULL
             );
 
             CREATE TABLE IF NOT EXISTS user_activity (
@@ -62,6 +63,11 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now'))
             );
         """)
+        # Миграция: добавляем колонку last_notified если её ещё нет
+        try:
+            conn.execute("ALTER TABLE watchlist ADD COLUMN last_notified TEXT DEFAULT NULL")
+        except Exception:
+            pass  # колонка уже существует
 
 
 # ── user_settings ──────────────────────────────────────────────────────────────
@@ -178,6 +184,15 @@ def get_all_watchlist_items() -> list[dict]:
     with get_conn() as conn:
         rows = conn.execute("SELECT * FROM watchlist").fetchall()
         return [dict(r) for r in rows]
+
+
+def update_watchlist_notified(watchlist_id: int):
+    """Обновляет время последнего уведомления для предмета в вотчлисте."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE watchlist SET last_notified = datetime('now') WHERE id = ?",
+            (watchlist_id,)
+        )
 
 
 def update_watchlist_threshold(watchlist_id: int, user_id: int, threshold: float):

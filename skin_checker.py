@@ -156,25 +156,39 @@ def format_price_message(price_data: dict) -> str:
 
 # ── Фоновая проверка вотчлиста ─────────────────────────────────────────────────
 
+NOTIFY_COOLDOWN_HOURS = 24  # не слать уведомление чаще раза в 24 часа
+
+
 async def check_watchlist(context):
     """
     Вызывается APScheduler каждые 30 минут.
     Проверяет все записи вотчлиста и отправляет уведомление
     если цена упала до порога или ниже.
+    Повторное уведомление по одному предмету — не чаще раза в 24 часа.
     """
-    from database import get_all_watchlist_items, get_user_settings
+    from datetime import datetime, timedelta
+    from database import get_all_watchlist_items, get_user_settings, update_watchlist_notified
 
     items = get_all_watchlist_items()
-    notified: dict[tuple, bool] = {}  # (user_id, item_name) → уже уведомили
 
     for entry in items:
         user_id = entry["user_id"]
         item_name = entry["item_name"]
         threshold = entry["threshold"]
-        key = (user_id, item_name)
 
-        if key in notified:
+        # Пропускаем если порог не задан
+        if not threshold or threshold <= 0:
             continue
+
+        # Проверяем cooldown — не уведомляли ли уже недавно
+        last_notified = entry.get("last_notified")
+        if last_notified:
+            try:
+                last_dt = datetime.fromisoformat(last_notified)
+                if datetime.utcnow() - last_dt < timedelta(hours=NOTIFY_COOLDOWN_HOURS):
+                    continue  # ещё не прошло 24 часа
+            except ValueError:
+                pass
 
         settings = get_user_settings(user_id)
         currency = settings.get("currency", "RUB")
@@ -184,7 +198,7 @@ async def check_watchlist(context):
             continue
 
         lowest = price_data["lowest"]
-        if threshold > 0 and lowest <= threshold:
+        if lowest <= threshold:
             sym = price_data["symbol"]
             text = (
                 f"🔔 <b>Уведомление вотчлиста</b>\n\n"
@@ -196,7 +210,7 @@ async def check_watchlist(context):
                 await context.bot.send_message(
                     chat_id=user_id, text=text, parse_mode="HTML"
                 )
-                notified[key] = True
+                update_watchlist_notified(entry["id"])
                 logger.info("Watchlist alert sent: user=%s item=%s", user_id, item_name)
             except Exception as e:
                 logger.warning("Failed to notify user %s: %s", user_id, e)
