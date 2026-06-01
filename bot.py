@@ -64,7 +64,7 @@ SETTINGS_CHOOSE = 20
 # ── Главная клавиатура ─────────────────────────────────────────────────────────
 
 # Замени на свой URL после деплоя на Vercel
-MINIAPP_URL = "https://YOUR_PROJECT.vercel.app"
+MINIAPP_URL = "https://miniapp-9re1s4tp3-mikpavlik-9526s-projects.vercel.app"
 
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
