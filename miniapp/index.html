@@ -592,29 +592,21 @@ function doSearch() {
         var imgHtml = icon ? '<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/' + icon + '/62fx62f" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : "";
         return '<div class="result-item" id="ri_' + name.replace(/[^a-zA-Z0-9]/g,'_') + '" onclick="showItemPrice(\'' + name.replace(/'/g, "\\'") + '\',\'' + icon.replace(/'/g, "\\'") + '\')">' +
           '<div class="result-item-row">' + imgHtml + '<span class="result-name">' + name + '</span><span class="result-arrow" style="margin-left:auto">›</span></div>' +
-          '<div class="result-price" id="price_' + name.replace(/[^a-zA-Z0-9]/g,'_') + '"><span style="color:var(--text-dim);font-size:12px">загрузка цены...</span></div>' +
+          '<div id="price_' + name.replace(/[^a-zA-Z0-9]/g,'_') + '"></div>' +
           '</div>';
       }).join("") + '</div>';
     container.innerHTML = html;
     savedSearchHtml = html;
-    // Грузим цены превью в фоне
+    // Грузим последние известные цены из БД (без запросов к Steam)
     apiFetch("/api/price-preview?items=" + encodeURIComponent(itemNames.join(","))).then(function(pd) {
       itemNames.forEach(function(name) {
         var el = document.getElementById("price_" + name.replace(/[^a-zA-Z0-9]/g,'_'));
-        if (el) {
-          var price = pd.prices[name];
-          el.innerHTML = price ? '<span class="result-price">от ' + fmt(price) + ' ' + pd.symbol + '</span>' : '<span style="color:var(--text-dim);font-size:12px">нет данных о цене</span>';
+        if (el && pd.prices[name]) {
+          el.innerHTML = '<span class="result-price">последняя цена: ' + fmt(pd.prices[name]) + ' ' + pd.symbol + '</span>';
         }
       });
       savedSearchHtml = container.innerHTML;
-    }).catch(function() {
-      // Цены не загрузились — не критично
-      itemNames.forEach(function(name) {
-        var el = document.getElementById("price_" + name.replace(/[^a-zA-Z0-9]/g,'_'));
-        if (el) el.innerHTML = "";
-      });
-      savedSearchHtml = container.innerHTML;
-    });
+    }).catch(function() { savedSearchHtml = container.innerHTML; });
   }).catch(function(e) {
     container.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><div>' + e.message + '</div></div>';
   });
@@ -1137,6 +1129,13 @@ function showToast(msg) {
   t.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(function() { t.classList.remove("show"); }, 2500);
+}
+
+init();
+</script>
+</body>
+</html>
+setTimeout(function() { t.classList.remove("show"); }, 2500);
 }
 
 init();

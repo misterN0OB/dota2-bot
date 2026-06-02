@@ -52,7 +52,7 @@ FREE_PORTFOLIO_LIMIT = 5
 
 # Кеш для топ/дорогих предметов (защита от Steam rate limit)
 _item_cache: dict = {}
-CACHE_TTL = 300  # 5 минут
+CACHE_TTL = 1800  # 30 минут
 
 # Популярные предметы Dota 2 (берём 8 — покажем первые 5 с ценой > 0)
 TOP_ITEMS = [
@@ -214,17 +214,17 @@ def search(q: str = Query(..., min_length=2), user: dict = Depends(get_current_u
 
 @app.get("/api/price-preview")
 def price_preview(items: str = Query(...), user: dict = Depends(get_current_user)):
-    """Цены для отображения в списке. Не считается в лимиты проверок."""
+    """Последние известные цены из БД — без запросов к Steam."""
     item_list = [i.strip() for i in items.split(",") if i.strip()][:8]
     settings = get_user_settings(user["id"])
     currency = settings.get("currency", "RUB")
     symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
     prices = {}
     for name in item_list:
-        data = get_item_price(name, currency)
-        if data and data["lowest"] > 0:
-            prices[name] = data["lowest"]
-    return {"prices": prices, "symbol": symbol}
+        history = get_price_history(name, limit=1)
+        if history:
+            prices[name] = history[0]["price"]
+    return {"prices": prices, "symbol": symbol, "from_cache": True}
 
 
 @app.get("/api/price")
@@ -439,7 +439,11 @@ def _fetch_item_list(item_names: list, currency: str, symbol: str, limit: int = 
     for item_name in item_names:
         if len(result) >= limit:
             break
-        price_data = get_item_price(item_name, currency)
+        # Пауза 0.4с между запросами — защита от burst rate limit
+        if result:
+            time.sleep(0.4)
+        # Для фоновых запросов: 1 попытка без ожидания
+        price_data = get_item_price(item_name, currency, retries=1, retry_delay=0)
         if price_data and price_data["lowest"] > 0:
             result.append({
                 "item_name": item_name,

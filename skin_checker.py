@@ -58,10 +58,11 @@ def parse_price_value(price_str: str) -> float:
         return 0.0
 
 
-def get_item_price(item_name: str, currency: str = "RUB") -> dict | None:
+def get_item_price(item_name: str, currency: str = "RUB", retries: int = 3, retry_delay: float = 2.0) -> dict | None:
     """
     Возвращает словарь с ценами или None если предмет не найден / ошибка API.
-    Пробует до 3 раз с паузой при rate limit.
+    retries=3, retry_delay=2.0 — для пользовательских запросов (ждём и повторяем)
+    retries=1, retry_delay=0   — для фоновых запросов (не ждём)
     """
     cur = CURRENCIES.get(currency, CURRENCIES["RUB"])
     params = {
@@ -69,27 +70,23 @@ def get_item_price(item_name: str, currency: str = "RUB") -> dict | None:
         "currency": cur["code"],
         "market_hash_name": item_name,
     }
-    for attempt in range(3):
+    for attempt in range(retries):
         try:
             if attempt > 0:
-                time.sleep(1.5)  # пауза перед повтором при rate limit
+                time.sleep(retry_delay)
             resp = requests.get(
                 STEAM_PRICE_URL, params=params, headers=HEADERS, timeout=10
             )
-            # 429 = rate limit, пробуем ещё раз
             if resp.status_code == 429:
-                logger.warning("Steam rate limit for '%s', attempt %d", item_name, attempt + 1)
+                logger.warning("Steam rate limit for '%s', attempt %d/%d", item_name, attempt + 1, retries)
                 continue
             resp.raise_for_status()
             data = resp.json()
-
             if not data.get("success"):
                 return None
-
             lowest = parse_price_value(data.get("lowest_price", ""))
             median = parse_price_value(data.get("median_price", ""))
             volume_raw = data.get("volume", "0").replace(",", "").replace(" ", "")
-
             return {
                 "lowest": lowest,
                 "median": median,
