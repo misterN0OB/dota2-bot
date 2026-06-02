@@ -405,6 +405,8 @@ var chartInstance = null;
 var userIsPremium = false;
 var adController = null;
 var savedSearchHtml = "";
+var prevPage = null;     // откуда пришли перед просмотром карточки
+var prevContent = null;  // сохранённый HTML предыдущего экрана
 
 function apiUrl(path) {
   var sep = path.indexOf("?") >= 0 ? "&" : "?";
@@ -525,17 +527,38 @@ function doHomeSearch() {
 }
 
 function goToItemPrice(itemName, icon) {
+  // Запоминаем откуда пришли и что было на экране
+  prevPage = currentPage;
+  if (prevPage === "search") {
+    prevContent = document.getElementById("searchResults").innerHTML;
+  } else if (prevPage === "watchlist") {
+    prevContent = document.getElementById("watchlistContent").innerHTML;
+  } else if (prevPage === "portfolio") {
+    prevContent = document.getElementById("portfolioContent").innerHTML;
+  } else {
+    prevContent = null; // home — просто вернёмся на главную
+  }
   switchPage("search", document.querySelectorAll(".nav-btn")[1]);
   showItemPrice(itemName, icon || "");
 }
 
 function goBack() {
-  if (savedSearchHtml) {
-    document.getElementById("searchResults").innerHTML = savedSearchHtml;
-  } else {
-    document.getElementById("searchResults").innerHTML = "";
-    document.getElementById("searchInput").value = "";
+  if (!prevPage || prevPage === "search") {
+    // Вернуться к результатам поиска
+    var html = prevContent || savedSearchHtml || "";
+    document.getElementById("searchResults").innerHTML = html;
+    if (!html) document.getElementById("searchInput").value = "";
+  } else if (prevPage === "home") {
+    switchPage("home", document.querySelectorAll(".nav-btn")[0]);
+  } else if (prevPage === "watchlist") {
+    switchPage("watchlist", document.querySelectorAll(".nav-btn")[2]);
+    if (prevContent) document.getElementById("watchlistContent").innerHTML = prevContent;
+  } else if (prevPage === "portfolio") {
+    switchPage("portfolio", document.querySelectorAll(".nav-btn")[3]);
+    if (prevContent) document.getElementById("portfolioContent").innerHTML = prevContent;
   }
+  prevPage = null;
+  prevContent = null;
 }
 
 function inviteFriend() {

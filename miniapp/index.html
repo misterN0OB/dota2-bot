@@ -405,6 +405,8 @@ var chartInstance = null;
 var userIsPremium = false;
 var adController = null;
 var savedSearchHtml = "";
+var prevPage = null;     // откуда пришли перед просмотром карточки
+var prevContent = null;  // сохранённый HTML предыдущего экрана
 
 function apiUrl(path) {
   var sep = path.indexOf("?") >= 0 ? "&" : "?";
@@ -525,17 +527,38 @@ function doHomeSearch() {
 }
 
 function goToItemPrice(itemName, icon) {
+  // Запоминаем откуда пришли и что было на экране
+  prevPage = currentPage;
+  if (prevPage === "search") {
+    prevContent = document.getElementById("searchResults").innerHTML;
+  } else if (prevPage === "watchlist") {
+    prevContent = document.getElementById("watchlistContent").innerHTML;
+  } else if (prevPage === "portfolio") {
+    prevContent = document.getElementById("portfolioContent").innerHTML;
+  } else {
+    prevContent = null; // home — просто вернёмся на главную
+  }
   switchPage("search", document.querySelectorAll(".nav-btn")[1]);
   showItemPrice(itemName, icon || "");
 }
 
 function goBack() {
-  if (savedSearchHtml) {
-    document.getElementById("searchResults").innerHTML = savedSearchHtml;
-  } else {
-    document.getElementById("searchResults").innerHTML = "";
-    document.getElementById("searchInput").value = "";
+  if (!prevPage || prevPage === "search") {
+    // Вернуться к результатам поиска
+    var html = prevContent || savedSearchHtml || "";
+    document.getElementById("searchResults").innerHTML = html;
+    if (!html) document.getElementById("searchInput").value = "";
+  } else if (prevPage === "home") {
+    switchPage("home", document.querySelectorAll(".nav-btn")[0]);
+  } else if (prevPage === "watchlist") {
+    switchPage("watchlist", document.querySelectorAll(".nav-btn")[2]);
+    if (prevContent) document.getElementById("watchlistContent").innerHTML = prevContent;
+  } else if (prevPage === "portfolio") {
+    switchPage("portfolio", document.querySelectorAll(".nav-btn")[3]);
+    if (prevContent) document.getElementById("portfolioContent").innerHTML = prevContent;
   }
+  prevPage = null;
+  prevContent = null;
 }
 
 function inviteFriend() {
@@ -1061,6 +1084,48 @@ init();
 </script>
 </body>
 </html>
+  if (n == null) return "—";
+  return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+var toastTimer;
+function showToast(msg) {
+  var t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { t.classList.remove("show"); }, 2500);
+}
+
+init();
+</script>
+</body>
+</html>
+).then(function() {
+    currentCurrency = code;
+    currentSymbol = symbol;
+    document.getElementById("currencyBadge").textContent = code;
+    document.querySelectorAll(".currency-option").forEach(function(o) {
+      o.classList.remove("selected");
+      var chk = o.querySelector(".currency-check");
+      if (chk) chk.parentNode.removeChild(chk);
+    });
+    el.classList.add("selected");
+    closeCurrencyModal();
+    showToast("Валюта: " + code);
+  }).catch(function(e) { showToast(e.message); });
+}
+
+function openCurrencyModal() { document.getElementById("currencyModal").classList.add("open"); }
+function closeCurrencyModal() { document.getElementById("currencyModal").classList.remove("open"); }
+
+["addModal","currencyModal","premiumModal","limitModal"].forEach(function(id) {
+  document.getElementById(id).addEventListener("click", function(e) {
+    if (e.target === this) this.classList.remove("open");
+  });
+});
+
+function fmt(n) {
   if (n == null) return "—";
   return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
