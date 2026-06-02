@@ -1040,27 +1040,3 @@ init();
 </script>
 </body>
 </html>
-  toastTimer = setTimeout(function() { t.classList.remove("show"); }, 2500);
-}
-
-init();
-</script>
-</body>
-</html>
-—";
-  return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-var toastTimer;
-function showToast(msg) {
-  var t = document.getElementById("toast");
-  t.textContent = msg;
-  t.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(function() { t.classList.remove("show"); }, 2500);
-}
-
-init();
-</script>
-</body>
-</html>
