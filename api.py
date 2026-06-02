@@ -49,6 +49,10 @@ from skin_checker import get_item_price, search_items, CURRENCIES
 
 FREE_PORTFOLIO_LIMIT = 5
 
+# Кеш для топ/дорогих предметов (защита от Steam rate limit)
+_item_cache: dict = {}
+CACHE_TTL = 300  # 5 минут
+
 # Популярные предметы Dota 2
 TOP_ITEMS = [
     "Dragonclaw Hook",
@@ -417,12 +421,33 @@ def _fetch_item_list(item_names: list, currency: str, symbol: str) -> list:
     return result
 
 
+def _fetch_item_list_cached(cache_key: str, item_names: list, currency: str, symbol: str) -> list:
+    """Возвращает список предметов с кешированием на 5 минут."""
+    key = f"{cache_key}:{currency}"
+    cached = _item_cache.get(key)
+    if cached and time.time() - cached["ts"] < CACHE_TTL:
+        # Обновляем символ валюты в кеше
+        for item in cached["data"]:
+            item["symbol"] = symbol
+        return cached["data"]
+    fresh = _fetch_item_list(item_names, currency, symbol)
+    if fresh:
+        _item_cache[key] = {"data": fresh, "ts": time.time()}
+        return fresh
+    # Возвращаем устаревший кеш если Steam не отвечает
+    if cached:
+        for item in cached["data"]:
+            item["symbol"] = symbol
+        return cached["data"]
+    return []
+
+
 @app.get("/api/top-items")
 def get_top_items(user: dict = Depends(get_current_user)):
     settings = get_user_settings(user["id"])
     currency = settings.get("currency", "RUB")
     symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
-    return {"items": _fetch_item_list(TOP_ITEMS, currency, symbol)}
+    return {"items": _fetch_item_list_cached("top", TOP_ITEMS, currency, symbol)}
 
 
 @app.get("/api/expensive-items")
@@ -430,7 +455,7 @@ def get_expensive_items(user: dict = Depends(get_current_user)):
     settings = get_user_settings(user["id"])
     currency = settings.get("currency", "RUB")
     symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
-    return {"items": _fetch_item_list(EXPENSIVE_ITEMS, currency, symbol)}
+    return {"items": _fetch_item_list_cached("expensive", EXPENSIVE_ITEMS, currency, symbol)}
 
 
 @app.get("/api/premium")

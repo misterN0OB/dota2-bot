@@ -345,6 +345,16 @@
   .currency-option-sym { font-size: 14px; color: var(--text-dim); }
   .currency-check { color: var(--gold); font-size: 16px; }
 
+  /* ── Invite button ── */
+  .invite-btn {
+    width: 100%; padding: 12px 16px; margin-bottom: 16px;
+    background: linear-gradient(135deg, #1a2e1a, #0f1a0f);
+    border: 1px solid #2a5a2a; border-radius: var(--radius);
+    color: #4caf50; font-size: 14px; font-weight: 600;
+    cursor: pointer; text-align: center;
+  }
+  .invite-btn:active { opacity: 0.8; }
+
   /* ── Toast ── */
   .toast {
     position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%);
@@ -372,7 +382,7 @@
 <div id="page-home" class="page active">
   <!-- Баннер -->
   <div class="home-banner">
-    <div class="home-banner-icon">🛡️</div>
+    <img src="logo.png" alt="Dota 2" style="width:72px;height:72px;border-radius:14px;object-fit:cover;margin-bottom:10px;box-shadow:0 4px 16px rgba(200,41,45,0.4)">
     <div class="home-banner-title">Dota 2 Price Tracker</div>
     <div class="home-banner-sub">Цены Steam Market в реальном времени</div>
   </div>
@@ -384,6 +394,11 @@
     <button class="search-btn" onclick="doHomeSearch()">🔍</button>
   </div>
 
+  <!-- Кнопка пригласить -->
+  <button class="invite-btn" onclick="inviteFriend()">
+    🎁 Пригласить друга — получи +3 слота в Избранное
+  </button>
+
   <!-- Разделы -->
   <div class="home-sections">
     <div class="home-section-btn" onclick="switchPage('search', document.querySelectorAll('.nav-btn')[1])">
@@ -393,7 +408,7 @@
     </div>
     <div class="home-section-btn" onclick="switchPage('watchlist', document.querySelectorAll('.nav-btn')[2])">
       <span class="sec-icon">⭐</span>
-      <span class="sec-name">Вотчлист</span>
+      <span class="sec-name">Избранное</span>
       <span class="sec-desc">Отслеживание цен</span>
     </div>
     <div class="home-section-btn" onclick="switchPage('portfolio', document.querySelectorAll('.nav-btn')[3])">
@@ -465,7 +480,7 @@
     <span class="icon">🔍</span>Поиск
   </button>
   <button class="nav-btn" data-page="watchlist" onclick="switchPage('watchlist', this)">
-    <span class="icon">⭐</span>Вотчлист
+    <span class="icon">⭐</span>Избранное
   </button>
   <button class="nav-btn" data-page="portfolio" onclick="switchPage('portfolio', this)">
     <span class="icon">💼</span>Портфель
@@ -481,7 +496,7 @@
 <!-- Add modal -->
 <div class="modal-overlay" id="addModal">
   <div class="modal">
-    <div class="modal-title" id="addModalTitle">Добавить в вотчлист</div>
+    <div class="modal-title" id="addModalTitle">Добавить в Избранное</div>
     <div id="addModalSearchBox">
       <input class="modal-input" id="addModalSearch" placeholder="Поиск предмета..."
         onkeydown="if(event.key==='Enter') doModalSearch()">
@@ -529,7 +544,7 @@
     <div class="premium-title">Dota 2 Tracker Premium</div>
     <div class="premium-features">
       <div class="premium-feature"><span class="feat-icon">🔍</span> Безлимитные проверки цены</div>
-      <div class="premium-feature"><span class="feat-icon">♾️</span> Безлимитный вотчлист</div>
+      <div class="premium-feature"><span class="feat-icon">♾️</span> Безлимитный Избранное</div>
       <div class="premium-feature"><span class="feat-icon">💼</span> Безлимитный портфель</div>
       <div class="premium-feature"><span class="feat-icon">🚫</span> Без рекламы</div>
       <div class="premium-feature"><span class="feat-icon">📈</span> Уведомления о росте и снижении</div>
@@ -875,7 +890,7 @@ async function loadWatchlist() {
 async function deleteWatchlistItem(id) {
   try {
     await apiFetch(`/api/watchlist/${id}`, { method: "DELETE" });
-    showToast("Удалено из вотчлиста");
+    showToast("Удалено из Избранноеа");
     loadWatchlist();
   } catch (e) { showToast(e.message); }
 }
@@ -1034,7 +1049,7 @@ async function loadChart(itemName) {
 function openAddModal() {
   addModalSelectedItem = null;
   document.getElementById("addModalTitle").textContent =
-    addModalMode === "watchlist" ? "Добавить в вотчлист" : "Добавить в портфель";
+    addModalMode === "watchlist" ? "Добавить в Избранное" : "Добавить в портфель";
   document.getElementById("addModalSearch").value = "";
   document.getElementById("addModalResults").innerHTML = "";
   document.getElementById("addModalSearchBox").style.display = "block";
@@ -1118,7 +1133,7 @@ async function submitAdd() {
           threshold_high: tHigh > 0 ? tHigh : null,
         }),
       });
-      showToast("Добавлено в вотчлист ⭐");
+      showToast("Добавлено в Избранное ⭐");
       closeAddModal();
       loadWatchlist();
     } else {
@@ -1142,6 +1157,18 @@ async function submitAdd() {
     } else {
       showToast(e.message);
     }
+  }
+}
+
+function inviteFriend() {
+  const userId = window._meData && window._meData.user && window._meData.user.id;
+  if (!userId) { showToast("Сначала открой приложение через Telegram"); return; }
+  const link = `https://t.me/Dota2PriceBot?start=ref_${userId}`;
+  const text = `🎮 Dota 2 Price Tracker — проверяй цены скинов прямо в Telegram!\n${link}`;
+  if (tg.openTelegramLink) {
+    tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("🎮 Dota 2 Price Tracker — цены скинов в Telegram!")}`);
+  } else {
+    showToast("Ссылка: " + link);
   }
 }
 
@@ -1189,12 +1216,12 @@ function closeLimitModal() {
 }
 
 function openWatchlistLimitModal(msg) {
-  // Для лимита вотчлиста открываем тот же модал но с другой кнопкой рекламы
+  // Для лимита Избранноеа открываем тот же модал но с другой кнопкой рекламы
   const btn = document.getElementById("watchAdBtn");
-  btn.textContent = "📺 Смотреть рекламу (+1 слот вотчлиста)";
+  btn.textContent = "📺 Смотреть рекламу (+1 слот Избранноеа)";
   btn.onclick = () => watchAdForReward("watchlist");
   document.getElementById("limitModalText").textContent = msg ||
-    "Достигнут лимит вотчлиста. Посмотри рекламу (+1 слот) или оформи Premium.";
+    "Достигнут лимит Избранноеа. Посмотри рекламу (+1 слот) или оформи Premium.";
   document.getElementById("limitModal").classList.add("open");
 }
 
@@ -1283,30 +1310,4 @@ function closeCurrencyModal() { document.getElementById("currencyModal").classLi
 
 // Закрытие модалок по клику на overlay
 ["addModal","currencyModal","premiumModal","limitModal"].forEach(id => {
-  document.getElementById(id).addEventListener("click", function(e) {
-    if (e.target === this) this.classList.remove("open");
-  });
-});
-
-// ── Utils ─────────────────────────────────────────────────────────────────────
-
-function fmt(n) {
-  if (n == null) return "—";
-  return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-let toastTimer;
-function showToast(msg) {
-  const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
-}
-
-// ── Start ─────────────────────────────────────────────────────────────────────
-init();
-</script>
-</body>
-</html>
-                                                                                                                                                                                                                                                                                                                                                                                                
+  d
