@@ -207,7 +207,7 @@ def set_currency(body: CurrencyRequest, user: dict = Depends(get_current_user)):
 
 @app.get("/api/search")
 def search(q: str = Query(..., min_length=2), user: dict = Depends(get_current_user)):
-    results = search_items(q, count=8)
+    results = search_items(q, count=15)
     return {"results": results}
 
 

@@ -262,6 +262,17 @@
     </div>
     <div id="chartSearchResults"></div>
   </div>
+  <div id="chartHint" style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-top:4px">
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:10px">&#128200; Как работает график цен</div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7">
+      График строится из твоих проверок цены. Каждый раз когда ты открываешь цену предмета — точка добавляется в историю.<br><br>
+      <b style="color:var(--text)">Как начать:</b><br>
+      1. Найди предмет через <b style="color:var(--gold)">Поиск</b><br>
+      2. Открой его цену<br>
+      3. Возвращайся сюда и введи название<br><br>
+      <span style="color:var(--text-dim);font-size:12px">Чем чаще проверяешь цену — тем подробнее график.</span>
+    </div>
+  </div>
   <div id="chartContainer" style="display:none">
     <div class="chart-container">
       <div class="chart-title" id="chartTitle">История цены</div>
@@ -726,6 +737,7 @@ function deletePortfolioItem(id) {
 function doChartSearch() {
   var q = document.getElementById("chartSearchInput").value.trim();
   if (!q) return;
+  document.getElementById("chartHint").style.display = "none";
   var container = document.getElementById("chartSearchResults");
   container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   apiFetch("/api/search?q=" + encodeURIComponent(q)).then(function(data) {
@@ -994,4 +1006,4 @@ init();
 </script>
 </body>
 </html>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+ 
