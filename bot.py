@@ -105,8 +105,30 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         set_premium(user.id, True)
 
     # Реферальная программа: /start ref_<referrer_id>
+    # Покупка премиума из мини-апп: /start premium
     args = context.args
-    if args and args[0].startswith("ref_"):
+    if args and args[0] == "premium":
+        # Сразу отправляем инвойс
+        if is_premium(user.id):
+            await update.message.reply_text(
+                "⭐ У тебя уже есть <b>Premium</b>! Спасибо за поддержку 🙏",
+                parse_mode="HTML",
+            )
+            return
+        await update.message.reply_invoice(
+            title="Dota 2 Price Tracker — Premium",
+            description=(
+                "✅ Безлимитные проверки цены\n"
+                "✅ Безлимитное Избранное\n"
+                "✅ Безлимитный портфель\n"
+                "✅ Без рекламы"
+            ),
+            payload="premium_purchase",
+            currency="XTR",
+            prices=[LabeledPrice("Premium доступ", STARS_PRICE)],
+        )
+        return
+    elif args and args[0].startswith("ref_"):
         try:
             referrer_id = int(args[0][4:])
             if referrer_id != user.id:
@@ -116,7 +138,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         chat_id=referrer_id,
                         text=(
                             f"🎉 По твоей ссылке зарегистрировался новый пользователь!\n\n"
-                            f"🎁 Тебе начислено <b>+3 слота</b> в вотчлисте.\n"
+                            f"🎁 Тебе начислено <b>+3 слота</b> в Избранное.\n"
                             f"Приглашай больше друзей — получай ещё слоты!"
                         ),
                         parse_mode="HTML",

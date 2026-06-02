@@ -252,10 +252,15 @@ def get_watchlist_api(user: dict = Depends(get_current_user)):
     result = []
     for item in items:
         price_data = get_item_price(item["item_name"], currency)
+        icon = ""
+        sr = search_items(item["item_name"], count=1)
+        if sr:
+            icon = sr[0].get("icon", "")
         result.append({
             **item,
             "current_price": price_data["lowest"] if price_data else None,
             "symbol": symbol,
+            "icon": icon,
         })
     return {"items": result, "symbol": symbol}
 

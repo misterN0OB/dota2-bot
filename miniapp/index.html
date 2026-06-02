@@ -57,6 +57,10 @@
 
   .invite-btn { width: 100%; padding: 12px 16px; margin-bottom: 16px; background: linear-gradient(135deg, #1a2e1a, #0f1a0f); border: 1px solid #2a5a2a; border-radius: var(--radius); color: #4caf50; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; }
   .invite-btn:active { opacity: 0.8; }
+  .cs2-banner { background: linear-gradient(135deg, #0f1a2e, #1a2a3e); border: 1px solid #1e3a5e; border-radius: var(--radius); padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; margin-bottom: 16px; }
+  .cs2-banner:active { opacity: 0.8; }
+  .item-icon-large { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: var(--border); flex-shrink: 0; }
+  .watchlist-item-icon { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; background: var(--border); flex-shrink: 0; margin-bottom: 8px; }
 
   .section-title { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; margin-top: 4px; }
 
@@ -219,6 +223,16 @@
 
   <div class="section-title" style="margin-top:16px">&#128142; Самые дорогие</div>
   <div id="expensiveItemsList"><div class="loading"><div class="spinner"></div></div></div>
+
+  <!-- CS2 реклама -->
+  <div class="cs2-banner" onclick="tg.openTelegramLink('https://t.me/cs2skinprice_bot')" style="margin-top:20px">
+    <span style="font-size:26px">&#127918;</span>
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:700;color:#4a9eff">Бот для отслеживания цен на скины CS2</div>
+      <div style="font-size:11px;color:var(--text-dim)">@cs2skinprice_bot · Открыть в Telegram</div>
+    </div>
+    <span style="color:var(--text-dim);font-size:16px">&#8250;</span>
+  </div>
 </div>
 
 <div id="page-search" class="page">
@@ -460,7 +474,8 @@ function renderItemList(items, containerId) {
     return;
   }
   container.innerHTML = items.map(function(item) {
-    return '<div class="top-item" onclick="goToItemPrice(\'' + item.item_name.replace(/'/g, "\\'") + '\')">' +
+    var safeIcon = (item.icon || "").replace(/'/g, "\\'");
+    return '<div class="top-item" onclick="goToItemPrice(\'' + item.item_name.replace(/'/g, "\\'") + '\',\'' + safeIcon + '\')">' +
       itemImgHtml(item.icon) +
       '<span class="top-item-name">' + item.item_name + '</span>' +
       '<span class="top-item-price">' + fmt(item.lowest) + ' ' + item.symbol + '</span>' +
@@ -492,9 +507,13 @@ function doHomeSearch() {
   doSearch();
 }
 
-function goToItemPrice(itemName) {
+function goToItemPrice(itemName, icon) {
   switchPage("search", document.querySelectorAll(".nav-btn")[1]);
-  showItemPrice(itemName);
+  showItemPrice(itemName, icon || "");
+}
+
+function goBack() {
+  document.getElementById("searchResults").innerHTML = "";
 }
 
 function inviteFriend() {
@@ -522,15 +541,16 @@ function doSearch() {
     container.innerHTML = '<div class="section-title">Результаты поиска</div><div class="results-list">' +
       data.results.map(function(item) {
         var name = item.name || item;
-        var imgHtml = item.icon ? '<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/' + item.icon + '/62fx62f" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : "";
-        return '<div class="result-item" onclick="showItemPrice(\'' + name.replace(/'/g, "\\'") + '\')">' + imgHtml + '<span class="result-name">' + name + '</span><span class="result-arrow">›</span></div>';
+        var icon = item.icon || "";
+        var imgHtml = icon ? '<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/' + icon + '/62fx62f" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : "";
+        return '<div class="result-item" onclick="showItemPrice(\'' + name.replace(/'/g, "\\'") + '\',\'' + icon.replace(/'/g, "\\'") + '\')">' + imgHtml + '<span class="result-name">' + name + '</span><span class="result-arrow">›</span></div>';
       }).join("") + '</div>';
   }).catch(function(e) {
     container.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><div>' + e.message + '</div></div>';
   });
 }
 
-function showItemPrice(itemName) {
+function showItemPrice(itemName, itemIcon) {
   var container = document.getElementById("searchResults");
   container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Загружаю цену...</div></div>';
   apiFetch("/api/price?item=" + encodeURIComponent(itemName)).then(function(data) {
@@ -542,14 +562,18 @@ function showItemPrice(itemName) {
     var checksHtml = checksLeft != null
       ? '<div class="price-meta" style="margin-top:8px">Осталось проверок: <b>' + checksLeft + '/' + data.checks_limit + '</b> на этой неделе · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">∞ PRO</span></div>'
       : "";
+    var iconHtml = itemIcon
+      ? '<img class="item-icon-large" src="https://community.akamai.steamstatic.com/economy/image/' + itemIcon + '/96fx96f" alt="" style="display:block;margin:0 auto 12px" onerror="this.style.display=\'none\'">'
+      : "";
     container.innerHTML = '<div class="price-card">' +
+      iconHtml +
       '<div class="price-card-name">' + data.item_name + '</div>' +
       '<div class="price-row"><span class="price-label">Минимальная цена</span><span class="price-value main">' + fmt(data.lowest) + ' ' + data.symbol + '</span></div>' +
       '<div class="price-row"><span class="price-label">Медианная цена</span><span class="price-value">' + fmt(data.median) + ' ' + data.symbol + '</span></div>' +
       (data.volume ? '<div class="price-meta">Продано за 24ч: ' + data.volume + '</div>' : '') +
       checksHtml +
       '<div class="price-actions">' +
-      '<button class="btn btn-secondary" onclick="doSearch()">◀ Назад</button>' +
+      '<button class="btn btn-secondary" onclick="goBack()">◀ Назад</button>' +
       '<button class="btn btn-secondary" onclick="addToWatchlistQuick(\'' + itemName.replace(/'/g, "\\'") + '\')">⭐</button>' +
       '<button class="btn btn-gold" onclick="addToPortfolioQuick(\'' + itemName.replace(/'/g, "\\'") + '\',' + data.lowest + ')">💼 Портфель</button>' +
       '</div></div>';
@@ -557,7 +581,7 @@ function showItemPrice(itemName) {
     if (e.message.indexOf("Лимит") >= 0 || e.message.indexOf("лимит") >= 0 || e.message.indexOf("429") >= 0) {
       openLimitModal(e.message);
     } else {
-      container.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><div>' + e.message + '</div></div>';
+      container.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><div>' + e.message + '</div><div style="margin-top:12px"><button class="btn btn-secondary" style="max-width:120px" onclick="goBack()">◀ Назад</button></div></div>';
     }
   });
 }
@@ -590,8 +614,10 @@ function loadWatchlist() {
       html += data.items.map(function(item) {
         var belowThreshold = item.threshold > 0 && item.current_price && item.current_price <= item.threshold;
         var aboveHigh = item.threshold_high > 0 && item.current_price && item.current_price >= item.threshold_high;
-        return '<div class="item-card">' +
-          '<div class="item-card-header"><div class="item-card-name">' + item.item_name + '</div><button class="item-card-delete" onclick="deleteWatchlistItem(' + item.id + ')">×</button></div>' +
+        var iconHtml = item.icon ? '<img class="watchlist-item-icon" src="https://community.akamai.steamstatic.com/economy/image/' + item.icon + '/62fx62f" alt="" onerror="this.style.display=\'none\'">' : "";
+        return '<div class="item-card" onclick="goToItemPrice(\'' + item.item_name.replace(/'/g, "\\'") + '\',\'' + (item.icon || "").replace(/'/g, "\\'") + '\')" style="cursor:pointer">' +
+          iconHtml +
+          '<div class="item-card-header"><div class="item-card-name">' + item.item_name + '</div><button class="item-card-delete" onclick="event.stopPropagation();deleteWatchlistItem(' + item.id + ')">×</button></div>' +
           '<div class="item-card-row"><span class="item-card-label">Текущая цена</span><span class="item-card-value ' + (belowThreshold ? "threshold-below" : aboveHigh ? "profit-positive" : "") + '">' + (item.current_price ? fmt(item.current_price) + " " + item.symbol : "—") + '</span></div>' +
           (item.threshold > 0 ? '<div class="item-card-row"><span class="item-card-label">📉 Порог снижения</span><span class="item-card-value">' + fmt(item.threshold) + ' ' + item.symbol + '</span></div>' : '') +
           (item.threshold_high > 0 ? '<div class="item-card-row"><span class="item-card-label">📈 Порог роста</span><span class="item-card-value">' + fmt(item.threshold_high) + ' ' + item.symbol + '</span></div>' : '') +
