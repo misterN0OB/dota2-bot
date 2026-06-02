@@ -6,7 +6,6 @@
 <title>Dota 2 Price Tracker</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<!-- Adsgram SDK — загружаем асинхронно чтобы не блокировать страницу -->
 <script async src="https://sad.adsgram.ai/js/sad.min.js"></script>
 <style>
   :root {
@@ -23,189 +22,65 @@
     --red:      #c84040;
     --radius:   10px;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 70px; }
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    padding-bottom: 70px;
-  }
-
-  /* ── Header ── */
-  .header {
-    background: linear-gradient(135deg, #0d0d14 0%, #1a0a0a 100%);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 16px 10px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .header-logo { font-size: 22px; }
+  .header { background: linear-gradient(135deg, #0d0d14 0%, #1a0a0a 100%); border-bottom: 1px solid var(--border); padding: 14px 16px 10px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 100; }
   .header-title { font-size: 17px; font-weight: 700; color: var(--gold); }
   .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-  .premium-badge {
-    background: linear-gradient(135deg, #c89b3c, #8a6b28);
-    border-radius: 6px; padding: 3px 8px;
-    font-size: 11px; font-weight: 700; color: #000;
-    display: none;
-  }
+  .premium-badge { background: linear-gradient(135deg, #c89b3c, #8a6b28); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; color: #000; display: none; }
   .premium-badge.show { display: block; }
-  .currency-badge {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 6px; padding: 4px 10px;
-    font-size: 13px; color: var(--text-dim); cursor: pointer;
-  }
+  .currency-badge { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 13px; color: var(--text-dim); cursor: pointer; }
   .currency-badge:active { opacity: 0.7; }
 
-  /* ── Nav ── */
-  .nav {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: var(--surface); border-top: 1px solid var(--border);
-    display: flex; z-index: 100;
-  }
-  .nav-btn {
-    flex: 1; padding: 10px 4px 8px;
-    display: flex; flex-direction: column; align-items: center; gap: 3px;
-    background: none; border: none; color: var(--text-dim);
-    font-size: 10px; cursor: pointer; transition: color 0.15s;
-  }
+  .nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; z-index: 100; }
+  .nav-btn { flex: 1; padding: 10px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; color: var(--text-dim); font-size: 10px; cursor: pointer; transition: color 0.15s; }
   .nav-btn .icon { font-size: 20px; }
   .nav-btn.active { color: var(--gold); }
   .nav-btn:active { opacity: 0.7; }
 
-  /* ── Pages ── */
   .page { display: none; padding: 16px; }
   .page.active { display: block; }
 
-  /* ── HOME PAGE ── */
-  .home-banner {
-    background: linear-gradient(135deg, #1a0505 0%, #0d0d14 60%, #0a0a1a 100%);
-    border: 1px solid #3a1a1a;
-    border-radius: 14px;
-    padding: 20px 16px;
-    margin-bottom: 16px;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-  }
-  .home-banner::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: radial-gradient(circle at 50% 0%, rgba(200,41,45,0.15) 0%, transparent 70%);
-  }
-  .home-banner-icon { font-size: 48px; margin-bottom: 8px; }
-  .home-banner-title {
-    font-size: 22px; font-weight: 800;
-    background: linear-gradient(135deg, #c89b3c, #e8c870);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    margin-bottom: 6px;
-  }
+  .home-banner { background: linear-gradient(135deg, #1a0505 0%, #0d0d14 60%, #0a0a1a 100%); border: 1px solid #3a1a1a; border-radius: 14px; padding: 20px 16px; margin-bottom: 16px; text-align: center; position: relative; overflow: hidden; }
+  .home-banner::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 0%, rgba(200,41,45,0.15) 0%, transparent 70%); }
+  .home-banner-title { font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #c89b3c, #e8c870); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px; }
   .home-banner-sub { font-size: 13px; color: var(--text-dim); }
 
-  .home-search-box {
-    display: flex; gap: 8px; margin-bottom: 20px;
-  }
-
-  .home-sections {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 10px; margin-bottom: 20px;
-  }
-  .home-section-btn {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 14px 12px;
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    cursor: pointer; transition: border-color 0.15s;
-    text-align: center;
-  }
+  .home-search-box { display: flex; gap: 8px; margin-bottom: 20px; }
+  .home-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .home-section-btn { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; transition: border-color 0.15s; text-align: center; }
   .home-section-btn:active { border-color: var(--gold-dim); }
   .home-section-btn .sec-icon { font-size: 26px; }
   .home-section-btn .sec-name { font-size: 13px; font-weight: 600; }
   .home-section-btn .sec-desc { font-size: 11px; color: var(--text-dim); }
 
-  .section-title {
-    font-size: 12px; font-weight: 600; color: var(--text-dim);
-    text-transform: uppercase; letter-spacing: 0.8px;
-    margin-bottom: 10px; margin-top: 4px;
-  }
+  .invite-btn { width: 100%; padding: 12px 16px; margin-bottom: 16px; background: linear-gradient(135deg, #1a2e1a, #0f1a0f); border: 1px solid #2a5a2a; border-radius: var(--radius); color: #4caf50; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; }
+  .invite-btn:active { opacity: 0.8; }
 
-  /* Баннер DMarket */
-  .dmarket-banner {
-    background: linear-gradient(135deg, #0f1a2e, #1a2a3e);
-    border: 1px solid #1e3a5e;
-    border-radius: var(--radius);
-    padding: 12px 14px;
-    margin-bottom: 16px;
-    display: flex; align-items: center; gap: 12px;
-    cursor: pointer; text-decoration: none;
-  }
-  .dmarket-banner:active { opacity: 0.8; }
-  .dmarket-logo { font-size: 28px; }
-  .dmarket-text { flex: 1; }
-  .dmarket-title { font-size: 13px; font-weight: 700; color: #4a9eff; }
-  .dmarket-sub { font-size: 11px; color: var(--text-dim); }
-  .dmarket-arrow { color: var(--text-dim); font-size: 16px; }
+  .section-title { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; margin-top: 4px; }
 
-  /* Топ предметы */
-  .top-item {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 10px 14px;
-    margin-bottom: 8px;
-    display: flex; align-items: center; gap: 10px; justify-content: space-between;
-    cursor: pointer; transition: border-color 0.15s;
-  }
+  .top-item { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; justify-content: space-between; cursor: pointer; transition: border-color 0.15s; }
   .top-item:active { border-color: var(--gold-dim); }
-  .top-item-img {
-    width: 40px; height: 40px; border-radius: 6px;
-    object-fit: cover; background: var(--border); flex-shrink: 0;
-  }
+  .top-item-img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: var(--border); flex-shrink: 0; }
   .top-item-name { font-size: 13px; font-weight: 500; flex: 1; margin-right: 8px; }
   .top-item-price { font-size: 14px; font-weight: 700; color: var(--gold); white-space: nowrap; }
+  .result-img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; background: var(--border); flex-shrink: 0; }
 
-  /* Search result с картинкой */
-  .result-img {
-    width: 36px; height: 36px; border-radius: 6px;
-    object-fit: cover; background: var(--border); flex-shrink: 0;
-  }
-
-  /* ── Search ── */
   .search-box { display: flex; gap: 8px; margin-bottom: 16px; }
-  .search-input {
-    flex: 1; background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 12px 14px;
-    color: var(--text); font-size: 15px; outline: none; transition: border-color 0.15s;
-  }
+  .search-input { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; color: var(--text); font-size: 15px; outline: none; transition: border-color 0.15s; }
   .search-input:focus { border-color: var(--gold-dim); }
   .search-input::placeholder { color: var(--text-dim); }
-  .search-btn {
-    background: var(--accent); border: none; border-radius: var(--radius);
-    padding: 12px 18px; color: #fff; font-size: 15px; cursor: pointer; font-weight: 600;
-    transition: opacity 0.15s;
-  }
+  .search-btn { background: var(--accent); border: none; border-radius: var(--radius); padding: 12px 18px; color: #fff; font-size: 15px; cursor: pointer; font-weight: 600; transition: opacity 0.15s; }
   .search-btn:active { opacity: 0.8; }
 
   .results-list { display: flex; flex-direction: column; gap: 8px; }
-  .result-item {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 12px 14px;
-    cursor: pointer; transition: border-color 0.15s;
-    display: flex; align-items: center; justify-content: space-between;
-  }
+  .result-item { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; transition: border-color 0.15s; display: flex; align-items: center; justify-content: space-between; }
   .result-item:active { border-color: var(--gold-dim); }
   .result-name { font-size: 14px; font-weight: 500; }
   .result-arrow { color: var(--text-dim); font-size: 12px; }
 
-  /* ── Price Card ── */
-  .price-card {
-    background: linear-gradient(135deg, var(--card) 0%, #1a0f0f 100%);
-    border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 18px; margin-bottom: 12px;
-  }
+  .price-card { background: linear-gradient(135deg, var(--card) 0%, #1a0f0f 100%); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 12px; }
   .price-card-name { font-size: 15px; font-weight: 600; color: var(--gold); margin-bottom: 14px; line-height: 1.4; }
   .price-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .price-label { font-size: 13px; color: var(--text-dim); }
@@ -214,38 +89,23 @@
   .price-meta { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
   .price-actions { display: flex; gap: 8px; margin-top: 14px; }
 
-  .btn {
-    flex: 1; padding: 10px; border: none; border-radius: var(--radius);
-    font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
-  }
+  .btn { flex: 1; padding: 10px; border: none; border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
   .btn:active { opacity: 0.8; }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
   .btn-gold { background: var(--gold); color: #000; }
   .btn-stars { background: linear-gradient(135deg, #5a3fa0, #7b5dc4); color: #fff; }
 
-  /* ── Empty / Loading ── */
   .empty-state { text-align: center; padding: 40px 20px; color: var(--text-dim); font-size: 14px; }
   .empty-state .emoji { font-size: 40px; margin-bottom: 12px; }
   .loading { text-align: center; padding: 30px; color: var(--text-dim); }
-  .spinner {
-    display: inline-block; width: 24px; height: 24px;
-    border: 2px solid var(--border); border-top-color: var(--gold);
-    border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 8px;
-  }
+  .spinner { display: inline-block; width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Item Cards ── */
-  .item-card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 14px; margin-bottom: 10px;
-  }
+  .item-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; }
   .item-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
   .item-card-name { font-size: 14px; font-weight: 600; flex: 1; margin-right: 8px; line-height: 1.3; }
-  .item-card-delete {
-    background: none; border: none; color: var(--text-dim);
-    font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1;
-  }
+  .item-card-delete { background: none; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1; }
   .item-card-delete:active { color: var(--red); }
   .item-card-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
   .item-card-label { color: var(--text-dim); }
@@ -254,68 +114,30 @@
   .profit-negative { color: var(--red); }
   .threshold-below { color: var(--green); }
 
-  /* Лимит-баннер */
-  .limit-banner {
-    background: linear-gradient(135deg, #1a0f00, #1e1a00);
-    border: 1px solid #3a2a00;
-    border-radius: var(--radius); padding: 12px 14px;
-    margin-bottom: 14px; display: flex; align-items: center; gap: 10px;
-    cursor: pointer;
-  }
+  .limit-banner { background: linear-gradient(135deg, #1a0f00, #1e1a00); border: 1px solid #3a2a00; border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
   .limit-banner:active { opacity: 0.85; }
   .limit-banner-text { flex: 1; font-size: 12px; color: #c8a040; line-height: 1.4; }
-  .limit-banner-btn {
-    background: var(--gold); color: #000; border: none;
-    border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 700;
-    white-space: nowrap; cursor: pointer;
-  }
+  .limit-banner-btn { background: var(--gold); color: #000; border: none; border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
 
-  /* ── Portfolio Summary ── */
-  .portfolio-summary {
-    background: linear-gradient(135deg, #1a0f0f 0%, var(--card) 100%);
-    border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 16px; margin-bottom: 16px;
-    display: flex; gap: 16px;
-  }
+  .portfolio-summary { background: linear-gradient(135deg, #1a0f0f 0%, var(--card) 100%); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; display: flex; gap: 16px; }
   .summary-block { flex: 1; text-align: center; }
   .summary-label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
   .summary-value { font-size: 17px; font-weight: 700; }
 
-  /* ── FAB ── */
-  .fab {
-    position: fixed; bottom: 78px; right: 16px;
-    width: 52px; height: 52px; background: var(--accent);
-    border: none; border-radius: 50%; color: #fff; font-size: 26px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; box-shadow: 0 4px 16px rgba(200,41,45,0.4);
-    transition: opacity 0.15s; z-index: 90;
-  }
+  .fab { position: fixed; bottom: 78px; right: 16px; width: 52px; height: 52px; background: var(--accent); border: none; border-radius: 50%; color: #fff; font-size: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 16px rgba(200,41,45,0.4); transition: opacity 0.15s; z-index: 90; }
   .fab:active { opacity: 0.8; }
   .fab.hidden { display: none; }
 
-  /* ── Modal ── */
-  .modal-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.7); z-index: 200; align-items: flex-end;
-  }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: flex-end; }
   .modal-overlay.open { display: flex; }
-  .modal {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 16px 16px 0 0; padding: 20px 16px 32px;
-    width: 100%; animation: slide-up 0.2s ease;
-  }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px 16px 0 0; padding: 20px 16px 32px; width: 100%; animation: slide-up 0.2s ease; }
   @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
   .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; color: var(--gold); }
-  .modal-input {
-    width: 100%; background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 12px 14px;
-    color: var(--text); font-size: 15px; outline: none; margin-bottom: 8px;
-  }
+  .modal-input { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; color: var(--text); font-size: 15px; outline: none; margin-bottom: 8px; }
   .modal-input:focus { border-color: var(--gold-dim); }
   .modal-hint { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5; }
   .modal-buttons { display: flex; gap: 8px; margin-top: 4px; }
 
-  /* ── Premium Modal ── */
   .premium-modal { text-align: center; }
   .premium-modal .stars-icon { font-size: 52px; margin-bottom: 10px; }
   .premium-modal .premium-title { font-size: 20px; font-weight: 800; color: var(--gold); margin-bottom: 8px; }
@@ -326,43 +148,19 @@
   .premium-price { font-size: 24px; font-weight: 800; color: var(--gold); margin: 12px 0 4px; }
   .premium-price-sub { font-size: 12px; color: var(--text-dim); margin-bottom: 16px; }
 
-  /* ── Chart ── */
   .graph-search { margin-bottom: 16px; }
   .chart-container { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
   .chart-title { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
 
-  /* ── Currency ── */
   .currency-list { display: flex; flex-direction: column; gap: 8px; }
-  .currency-option {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 12px 16px; cursor: pointer;
-    display: flex; align-items: center; justify-content: space-between;
-    transition: border-color 0.15s;
-  }
+  .currency-option { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: border-color 0.15s; }
   .currency-option.selected { border-color: var(--gold); }
   .currency-option:active { opacity: 0.8; }
   .currency-option-name { font-size: 15px; font-weight: 500; }
   .currency-option-sym { font-size: 14px; color: var(--text-dim); }
   .currency-check { color: var(--gold); font-size: 16px; }
 
-  /* ── Invite button ── */
-  .invite-btn {
-    width: 100%; padding: 12px 16px; margin-bottom: 16px;
-    background: linear-gradient(135deg, #1a2e1a, #0f1a0f);
-    border: 1px solid #2a5a2a; border-radius: var(--radius);
-    color: #4caf50; font-size: 14px; font-weight: 600;
-    cursor: pointer; text-align: center;
-  }
-  .invite-btn:active { opacity: 0.8; }
-
-  /* ── Toast ── */
-  .toast {
-    position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%);
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 20px; padding: 8px 18px;
-    font-size: 13px; color: var(--text); z-index: 300;
-    opacity: 0; transition: opacity 0.2s; white-space: nowrap;
-  }
+  .toast { position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 8px 18px; font-size: 13px; color: var(--text); z-index: 300; opacity: 0; transition: opacity 0.2s; white-space: nowrap; }
   .toast.show { opacity: 1; }
 </style>
 </head>
@@ -370,78 +168,63 @@
 
 <!-- Header -->
 <div class="header">
-  <img src="logo.png" alt="logo" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0">
+  <img src="logo.png" alt="logo" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">
   <span class="header-title">Dota 2 Prices</span>
   <div class="header-right">
-    <span class="premium-badge" id="premiumBadge">⭐ PRO</span>
+    <span class="premium-badge" id="premiumBadge">&#11088; PRO</span>
     <div class="currency-badge" onclick="openCurrencyModal()" id="currencyBadge">RUB</div>
   </div>
 </div>
 
 <!-- Pages -->
 <div id="page-home" class="page active">
-  <!-- Баннер -->
   <div class="home-banner">
-    <img src="logo.png" alt="Dota 2" style="width:72px;height:72px;border-radius:14px;object-fit:cover;margin-bottom:10px;box-shadow:0 4px 16px rgba(200,41,45,0.4)">
+    <img src="logo.png" alt="Dota 2" style="width:72px;height:72px;border-radius:14px;object-fit:cover;margin-bottom:10px;box-shadow:0 4px 16px rgba(200,41,45,0.4);position:relative;z-index:1" onerror="this.style.display='none'">
     <div class="home-banner-title">Dota 2 Price Tracker</div>
     <div class="home-banner-sub">Цены Steam Market в реальном времени</div>
   </div>
 
-  <!-- Быстрый поиск -->
   <div class="home-search-box">
-    <input class="search-input" id="homeSearchInput" placeholder="Быстрый поиск предмета..."
-      autocomplete="off" onkeydown="if(event.key==='Enter') doHomeSearch()">
-    <button class="search-btn" onclick="doHomeSearch()">🔍</button>
+    <input class="search-input" id="homeSearchInput" placeholder="Быстрый поиск предмета..." autocomplete="off" onkeydown="if(event.key==='Enter') doHomeSearch()">
+    <button class="search-btn" onclick="doHomeSearch()">&#128269;</button>
   </div>
 
-  <!-- Кнопка пригласить -->
-  <button class="invite-btn" onclick="inviteFriend()">
-    🎁 Пригласить друга — получи +3 слота в Избранное
-  </button>
+  <button class="invite-btn" onclick="inviteFriend()">&#127873; Пригласить друга — получи +3 слота в Избранное</button>
 
-  <!-- Разделы -->
   <div class="home-sections">
     <div class="home-section-btn" onclick="switchPage('search', document.querySelectorAll('.nav-btn')[1])">
-      <span class="sec-icon">🔍</span>
+      <span class="sec-icon">&#128269;</span>
       <span class="sec-name">Поиск</span>
       <span class="sec-desc">Найти предмет</span>
     </div>
     <div class="home-section-btn" onclick="switchPage('watchlist', document.querySelectorAll('.nav-btn')[2])">
-      <span class="sec-icon">⭐</span>
+      <span class="sec-icon">&#11088;</span>
       <span class="sec-name">Избранное</span>
       <span class="sec-desc">Отслеживание цен</span>
     </div>
     <div class="home-section-btn" onclick="switchPage('portfolio', document.querySelectorAll('.nav-btn')[3])">
-      <span class="sec-icon">💼</span>
+      <span class="sec-icon">&#128188;</span>
       <span class="sec-name">Портфель</span>
       <span class="sec-desc">Мои инвестиции</span>
     </div>
     <div class="home-section-btn" onclick="switchPage('chart', document.querySelectorAll('.nav-btn')[4])">
-      <span class="sec-icon">📈</span>
+      <span class="sec-icon">&#128200;</span>
       <span class="sec-name">Графики</span>
       <span class="sec-desc">История цен</span>
     </div>
   </div>
 
+  <div class="section-title">&#128293; Популярные предметы</div>
+  <div id="topItemsList"><div class="loading"><div class="spinner"></div></div></div>
 
-  <!-- Топ предметы -->
-  <div class="section-title">🔥 Популярные предметы</div>
-  <div id="topItemsList">
-    <div class="loading"><div class="spinner"></div></div>
-  </div>
-
-  <!-- Дорогие предметы -->
-  <div class="section-title" style="margin-top:16px">💎 Самые дорогие</div>
-  <div id="expensiveItemsList">
-    <div class="loading"><div class="spinner"></div></div>
-  </div>
+  <div class="section-title" style="margin-top:16px">&#128142; Самые дорогие</div>
+  <div id="expensiveItemsList"><div class="loading"><div class="spinner"></div></div></div>
 </div>
 
 <div id="page-search" class="page">
   <div class="search-box">
-    <input class="search-input" id="searchInput" placeholder="Название предмета..." autocomplete="off"
-      onkeydown="if(event.key==='Enter') doSearch()">
-    <button class="search-btn" onclick="doSearch()">🔍</button>
+    <input class="search-input" id="searchInput" placeholder="Название предмета..." autocomplete="off" onkeydown="if(event.key==='Enter') doSearch()">
+    <button class="search-btn" onclick="doSearch()">&#128269;</button>
   </div>
   <div id="searchResults"></div>
 </div>
@@ -457,9 +240,8 @@
 <div id="page-chart" class="page">
   <div class="graph-search">
     <div class="search-box">
-      <input class="search-input" id="chartSearchInput" placeholder="Название предмета..." autocomplete="off"
-        onkeydown="if(event.key==='Enter') doChartSearch()">
-      <button class="search-btn" onclick="doChartSearch()">🔍</button>
+      <input class="search-input" id="chartSearchInput" placeholder="Название предмета..." autocomplete="off" onkeydown="if(event.key==='Enter') doChartSearch()">
+      <button class="search-btn" onclick="doChartSearch()">&#128269;</button>
     </div>
     <div id="chartSearchResults"></div>
   </div>
@@ -474,40 +256,38 @@
 <!-- Nav -->
 <nav class="nav">
   <button class="nav-btn active" data-page="home" onclick="switchPage('home', this)">
-    <span class="icon">🏠</span>Главная
+    <span class="icon">&#127968;</span>Главная
   </button>
   <button class="nav-btn" data-page="search" onclick="switchPage('search', this)">
-    <span class="icon">🔍</span>Поиск
+    <span class="icon">&#128269;</span>Поиск
   </button>
   <button class="nav-btn" data-page="watchlist" onclick="switchPage('watchlist', this)">
-    <span class="icon">⭐</span>Избранное
+    <span class="icon">&#11088;</span>Избранное
   </button>
   <button class="nav-btn" data-page="portfolio" onclick="switchPage('portfolio', this)">
-    <span class="icon">💼</span>Портфель
+    <span class="icon">&#128188;</span>Портфель
   </button>
   <button class="nav-btn" data-page="chart" onclick="switchPage('chart', this)">
-    <span class="icon">📈</span>График
+    <span class="icon">&#128200;</span>График
   </button>
 </nav>
 
-<!-- FAB -->
-<button class="fab hidden" id="fab" onclick="openAddModal()">＋</button>
+<button class="fab hidden" id="fab" onclick="openAddModal()">&#65291;</button>
 
 <!-- Add modal -->
 <div class="modal-overlay" id="addModal">
   <div class="modal">
     <div class="modal-title" id="addModalTitle">Добавить в Избранное</div>
     <div id="addModalSearchBox">
-      <input class="modal-input" id="addModalSearch" placeholder="Поиск предмета..."
-        onkeydown="if(event.key==='Enter') doModalSearch()">
+      <input class="modal-input" id="addModalSearch" placeholder="Поиск предмета..." onkeydown="if(event.key==='Enter') doModalSearch()">
       <div id="addModalResults"></div>
     </div>
     <div id="addModalForm" style="display:none">
-      <div style="font-size:14px; margin-bottom:10px; color:var(--gold); font-weight:600" id="addModalItemName"></div>
+      <div style="font-size:14px;margin-bottom:10px;color:var(--gold);font-weight:600" id="addModalItemName"></div>
       <div id="addModalWatchlistFields">
-        <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">📉 Порог снижения (уведомление когда цена упадёт до)</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">&#128201; Порог снижения (уведомление когда цена упадёт до)</div>
         <input class="modal-input" id="addModalValueLow" type="number" step="0.01" min="0" placeholder="Например: 500 (или 0 — без уведомления)">
-        <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;margin-top:4px">📈 Порог роста (уведомление когда цена вырастет до)</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;margin-top:4px">&#128200; Порог роста (уведомление когда цена вырастет до)</div>
         <input class="modal-input" id="addModalValueHigh" type="number" step="0.01" min="0" placeholder="Например: 2000 (или 0 — без уведомления)">
       </div>
       <div id="addModalPortfolioField" style="display:none">
@@ -521,7 +301,7 @@
     </div>
     <div id="addModalSearchButtons" class="modal-buttons">
       <button class="btn btn-secondary" onclick="closeAddModal()">Отмена</button>
-      <button class="btn btn-primary" onclick="doModalSearch()">🔍 Найти</button>
+      <button class="btn btn-primary" onclick="doModalSearch()">&#128269; Найти</button>
     </div>
   </div>
 </div>
@@ -540,195 +320,173 @@
 <!-- Premium modal -->
 <div class="modal-overlay" id="premiumModal">
   <div class="modal premium-modal">
-    <div class="stars-icon">⭐</div>
+    <div class="stars-icon">&#11088;</div>
     <div class="premium-title">Dota 2 Tracker Premium</div>
     <div class="premium-features">
-      <div class="premium-feature"><span class="feat-icon">🔍</span> Безлимитные проверки цены</div>
-      <div class="premium-feature"><span class="feat-icon">♾️</span> Безлимитный Избранное</div>
-      <div class="premium-feature"><span class="feat-icon">💼</span> Безлимитный портфель</div>
-      <div class="premium-feature"><span class="feat-icon">🚫</span> Без рекламы</div>
-      <div class="premium-feature"><span class="feat-icon">📈</span> Уведомления о росте и снижении</div>
+      <div class="premium-feature"><span class="feat-icon">&#128269;</span> Безлимитные проверки цены</div>
+      <div class="premium-feature"><span class="feat-icon">&#9854;</span> Безлимитное Избранное</div>
+      <div class="premium-feature"><span class="feat-icon">&#128188;</span> Безлимитный портфель</div>
+      <div class="premium-feature"><span class="feat-icon">&#128683;</span> Без рекламы</div>
+      <div class="premium-feature"><span class="feat-icon">&#128200;</span> Уведомления о росте и снижении</div>
     </div>
-    <div class="premium-price">200 ⭐</div>
+    <div class="premium-price">200 &#11088;</div>
     <div class="premium-price-sub">Telegram Stars · Разовая оплата</div>
     <div class="modal-buttons">
       <button class="btn btn-secondary" onclick="closePremiumModal()">Закрыть</button>
-      <button class="btn btn-stars" onclick="buyPremium()">⭐ Купить Premium</button>
+      <button class="btn btn-stars" onclick="buyPremium()">&#11088; Купить Premium</button>
     </div>
   </div>
 </div>
 
-<!-- Limit modal (price checks exhausted) -->
+<!-- Limit modal -->
 <div class="modal-overlay" id="limitModal">
   <div class="modal" style="text-align:center">
-    <div style="font-size:48px;margin-bottom:10px">🔒</div>
+    <div style="font-size:48px;margin-bottom:10px">&#128274;</div>
     <div class="modal-title" style="text-align:center">Лимит исчерпан</div>
     <div class="modal-hint" id="limitModalText" style="margin-bottom:20px;font-size:14px;line-height:1.6"></div>
     <div style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn" id="watchAdBtn"
-        style="background:linear-gradient(135deg,#2d6a4f,#40916c);color:#fff;font-size:15px;padding:14px"
-        onclick="watchAdForReward('price_checks')">
-        📺 Смотреть рекламу (+3 проверки)
+      <button class="btn" id="watchAdBtn" style="background:linear-gradient(135deg,#2d6a4f,#40916c);color:#fff;font-size:15px;padding:14px" onclick="watchAdForReward('price_checks')">
+        &#128250; Смотреть рекламу (+3 проверки)
       </button>
       <button class="btn btn-stars" style="font-size:14px;padding:12px" onclick="closeLimitModal();openPremiumModal()">
-        ⭐ Оформить Premium — безлимит
+        &#11088; Оформить Premium — безлимит
       </button>
       <button class="btn btn-secondary" onclick="closeLimitModal()">Закрыть</button>
     </div>
   </div>
 </div>
 
-<!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
-// ── Init ─────────────────────────────────────────────────────────────────────
-
 const tg = window.Telegram.WebApp;
 tg.expand();
 
 const API_BASE = "https://exclusive-consoling-heavily.ngrok-free.dev";
-// ⬇ Замени на свой blockId из личного кабинета adsgram.ai
 const ADSGRAM_BLOCK_ID = "33734";
 
-let initData = tg.initData;
-let currentCurrency = "RUB";
-let currentSymbol = "руб.";
-let currentPage = "home";
-let addModalMode = "watchlist";
-let addModalSelectedItem = null;
-let chartInstance = null;
-let userIsPremium = false;
-let adController = null;
+var initData = tg.initData;
+var currentCurrency = "RUB";
+var currentSymbol = "руб.";
+var currentPage = "home";
+var addModalMode = "watchlist";
+var addModalSelectedItem = null;
+var chartInstance = null;
+var userIsPremium = false;
+var adController = null;
 
 function apiUrl(path) {
-  const sep = path.includes("?") ? "&" : "?";
-  return `${API_BASE}${path}${sep}initData=${encodeURIComponent(initData)}`;
+  var sep = path.indexOf("?") >= 0 ? "&" : "?";
+  return API_BASE + path + sep + "initData=" + encodeURIComponent(initData);
 }
 
-async function apiFetch(path, options = {}) {
-  const url = options.method && options.method !== "GET"
-    ? `${API_BASE}${path}?initData=${encodeURIComponent(initData)}`
+function apiFetch(path, options) {
+  options = options || {};
+  var url = (options.method && options.method !== "GET")
+    ? API_BASE + path + "?initData=" + encodeURIComponent(initData)
     : apiUrl(path);
-  const resp = await fetch(url, {
+  return fetch(url, Object.assign({
     headers: {
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true",
-    },
-    ...options,
+      "ngrok-skip-browser-warning": "true"
+    }
+  }, options)).then(function(resp) {
+    if (!resp.ok) {
+      return resp.json().catch(function() { return {}; }).then(function(err) {
+        var detail = err.detail;
+        var msg = typeof detail === "string" ? detail
+                 : Array.isArray(detail) ? detail.map(function(d) { return d.msg; }).join(", ")
+                 : "Ошибка " + resp.status;
+        throw new Error(msg);
+      });
+    }
+    return resp.json();
   });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    const detail = err.detail;
-    const msg = typeof detail === "string" ? detail
-               : Array.isArray(detail) ? detail.map(d => d.msg).join(", ")
-               : `Ошибка ${resp.status}`;
-    throw new Error(msg);
-  }
-  return resp.json();
 }
 
-async function init() {
-  try {
-    const me = await apiFetch("/api/me");
+function init() {
+  apiFetch("/api/me").then(function(me) {
     currentCurrency = me.currency;
     currentSymbol = me.currency_symbol;
     document.getElementById("currencyBadge").textContent = currentCurrency;
     renderCurrencyList(me.currencies);
-
-    // Сохраняем данные из /api/me (включает premium, лимиты)
     window._meData = me;
     userIsPremium = me.premium || false;
-
     if (userIsPremium) {
       document.getElementById("premiumBadge").classList.add("show");
     }
-
-    // Показываем счётчик проверок цены если не премиум
     if (!userIsPremium && me.checks_left != null && me.checks_left <= 5) {
-      showToast(`⚠️ Осталось ${me.checks_left}/${me.checks_limit} проверок на этой неделе`);
+      showToast("Осталось " + me.checks_left + "/" + me.checks_limit + " проверок на этой неделе");
     }
-
     loadTopItems();
     loadExpensiveItems();
-
-    // Adsgram инициализируем отдельно после загрузки страницы (не блокируем UI)
     if (!userIsPremium && ADSGRAM_BLOCK_ID !== "YOUR_BLOCK_ID_HERE") {
       setTimeout(initAdsgram, 3000);
     }
-  } catch (e) {
-    showToast("❌ " + (e.message || "Ошибка подключения"));
-    // Грузим топ скины даже если /api/me упал
+  }).catch(function(e) {
+    showToast("Ошибка подключения: " + (e.message || ""));
     loadTopItems();
     loadExpensiveItems();
-  }
+  });
 }
 
-// ── Navigation ────────────────────────────────────────────────────────────────
-
 function switchPage(page, btn) {
-  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".page").forEach(function(p) { p.classList.remove("active"); });
+  document.querySelectorAll(".nav-btn").forEach(function(b) { b.classList.remove("active"); });
   document.getElementById("page-" + page).classList.add("active");
   if (btn) btn.classList.add("active");
   currentPage = page;
-
-  const fab = document.getElementById("fab");
+  var fab = document.getElementById("fab");
   if (page === "watchlist" || page === "portfolio") {
     fab.classList.remove("hidden");
     addModalMode = page === "watchlist" ? "watchlist" : "portfolio";
   } else {
     fab.classList.add("hidden");
   }
-
   if (page === "watchlist") loadWatchlist();
   if (page === "portfolio") loadPortfolio();
 }
 
-// ── Home page ─────────────────────────────────────────────────────────────────
-
 function itemImgHtml(icon) {
   if (!icon) return "";
-  const src = `https://community.akamai.steamstatic.com/economy/image/${icon}/62fx62f`;
-  return `<img class="top-item-img" src="${src}" alt="" loading="lazy" onerror="this.style.display='none'">`;
+  var src = "https://community.akamai.steamstatic.com/economy/image/" + icon + "/62fx62f";
+  return '<img class="top-item-img" src="' + src + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
 }
 
 function renderItemList(items, containerId) {
-  const container = document.getElementById(containerId);
-  if (!items.length) {
-    container.innerHTML = `<div style="color:var(--text-dim);font-size:13px">Нет данных</div>`;
+  var container = document.getElementById(containerId);
+  if (!items || !items.length) {
+    container.innerHTML = '<div style="color:var(--text-dim);font-size:13px">Нет данных</div>';
     return;
   }
-  container.innerHTML = items.map(item => `
-    <div class="top-item" onclick="goToItemPrice('${item.item_name.replace(/'/g,"\\'")}')">
-      ${itemImgHtml(item.icon)}
-      <span class="top-item-name">${item.item_name}</span>
-      <span class="top-item-price">${fmt(item.lowest)} ${item.symbol}</span>
-    </div>`).join("");
+  container.innerHTML = items.map(function(item) {
+    return '<div class="top-item" onclick="goToItemPrice(\'' + item.item_name.replace(/'/g, "\\'") + '\')">' +
+      itemImgHtml(item.icon) +
+      '<span class="top-item-name">' + item.item_name + '</span>' +
+      '<span class="top-item-price">' + fmt(item.lowest) + ' ' + item.symbol + '</span>' +
+      '</div>';
+  }).join("");
 }
 
-async function loadTopItems() {
-  try {
-    const data = await apiFetch("/api/top-items");
+function loadTopItems() {
+  apiFetch("/api/top-items").then(function(data) {
     renderItemList(data.items, "topItemsList");
-  } catch (e) {
-    document.getElementById("topItemsList").innerHTML = `<div style="color:var(--text-dim);font-size:13px">Не удалось загрузить</div>`;
-  }
+  }).catch(function() {
+    document.getElementById("topItemsList").innerHTML = '<div style="color:var(--text-dim);font-size:13px">Не удалось загрузить</div>';
+  });
 }
 
-async function loadExpensiveItems() {
-  try {
-    const data = await apiFetch("/api/expensive-items");
+function loadExpensiveItems() {
+  apiFetch("/api/expensive-items").then(function(data) {
     renderItemList(data.items, "expensiveItemsList");
-  } catch (e) {
-    document.getElementById("expensiveItemsList").innerHTML = `<div style="color:var(--text-dim);font-size:13px">Не удалось загрузить</div>`;
-  }
+  }).catch(function() {
+    document.getElementById("expensiveItemsList").innerHTML = '<div style="color:var(--text-dim);font-size:13px">Не удалось загрузить</div>';
+  });
 }
 
 function doHomeSearch() {
-  const q = document.getElementById("homeSearchInput").value.trim();
+  var q = document.getElementById("homeSearchInput").value.trim();
   if (!q) return;
-  // Переключаем на вкладку поиска и выполняем поиск
   document.getElementById("searchInput").value = q;
   switchPage("search", document.querySelectorAll(".nav-btn")[1]);
   doSearch();
@@ -739,352 +497,252 @@ function goToItemPrice(itemName) {
   showItemPrice(itemName);
 }
 
-// ── Search ────────────────────────────────────────────────────────────────────
-
-async function doSearch() {
-  const q = document.getElementById("searchInput").value.trim();
-  if (!q) return;
-  const container = document.getElementById("searchResults");
-  container.innerHTML = `<div class="loading"><div class="spinner"></div><div>Поиск...</div></div>`;
-
+function inviteFriend() {
+  var userId = window._meData && window._meData.user && window._meData.user.id;
+  if (!userId) { showToast("Открой приложение через Telegram"); return; }
+  var link = "https://t.me/Dota2PriceBot?start=ref_" + userId;
   try {
-    const data = await apiFetch(`/api/search?q=${encodeURIComponent(q)}`);
-    if (!data.results.length) {
-      const steamUrl = `https://steamcommunity.com/market/search?appid=570&q=${encodeURIComponent(q)}`;
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="emoji">😕</div>
-          <div>Ничего не найдено по «${q}»</div>
-          <div style="margin-top:10px">
-            <a href="${steamUrl}" target="_blank" style="color:var(--gold)">Поискать на Steam Market →</a>
-          </div>
-        </div>`;
-      return;
-    }
-    container.innerHTML = `<div class="section-title">Результаты поиска</div><div class="results-list">` +
-      data.results.map(item => {
-        const name = item.name || item;
-        const imgHtml = item.icon ? `<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/${item.icon}/62fx62f" alt="" loading="lazy" onerror="this.style.display='none'">` : "";
-        return `<div class="result-item" onclick="showItemPrice('${name.replace(/'/g,"\\'")}')">
-          ${imgHtml}<span class="result-name">${name}</span><span class="result-arrow">›</span>
-        </div>`;
-      }).join("") + `</div>`;
-  } catch (e) {
-    container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
+    tg.openTelegramLink("https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent("Dota 2 Price Tracker — цены скинов в Telegram!"));
+  } catch(e) {
+    showToast("Ссылка: " + link);
   }
 }
 
-async function showItemPrice(itemName) {
-  const container = document.getElementById("searchResults");
-  container.innerHTML = `<div class="loading"><div class="spinner"></div><div>Загружаю цену...</div></div>`;
+function doSearch() {
+  var q = document.getElementById("searchInput").value.trim();
+  if (!q) return;
+  var container = document.getElementById("searchResults");
+  container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Поиск...</div></div>';
+  apiFetch("/api/search?q=" + encodeURIComponent(q)).then(function(data) {
+    if (!data.results.length) {
+      var steamUrl = "https://steamcommunity.com/market/search?appid=570&q=" + encodeURIComponent(q);
+      container.innerHTML = '<div class="empty-state"><div class="emoji">😕</div><div>Ничего не найдено по «' + q + '»</div><div style="margin-top:10px"><a href="' + steamUrl + '" target="_blank" style="color:var(--gold)">Поискать на Steam Market →</a></div></div>';
+      return;
+    }
+    container.innerHTML = '<div class="section-title">Результаты поиска</div><div class="results-list">' +
+      data.results.map(function(item) {
+        var name = item.name || item;
+        var imgHtml = item.icon ? '<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/' + item.icon + '/62fx62f" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : "";
+        return '<div class="result-item" onclick="showItemPrice(\'' + name.replace(/'/g, "\\'") + '\')">' + imgHtml + '<span class="result-name">' + name + '</span><span class="result-arrow">›</span></div>';
+      }).join("") + '</div>';
+  }).catch(function(e) {
+    container.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><div>' + e.message + '</div></div>';
+  });
+}
 
-  try {
-    const data = await apiFetch(`/api/price?item=${encodeURIComponent(itemName)}`);
-    // Обновляем счётчик в памяти из ответа API
+function showItemPrice(itemName) {
+  var container = document.getElementById("searchResults");
+  container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Загружаю цену...</div></div>';
+  apiFetch("/api/price?item=" + encodeURIComponent(itemName)).then(function(data) {
     if (data.checks_left != null && window._meData) {
       window._meData.checks_left = data.checks_left;
       window._meData.checks_limit = data.checks_limit;
     }
-    const checksLeft = !userIsPremium && data.checks_left != null ? data.checks_left : null;
-    const checksHtml = checksLeft != null
-      ? `<div class="price-meta" style="margin-top:8px">🔍 Осталось проверок: <b>${checksLeft}/${data.checks_limit}</b> на этой неделе · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">∞ PRO</span></div>`
+    var checksLeft = !userIsPremium && data.checks_left != null ? data.checks_left : null;
+    var checksHtml = checksLeft != null
+      ? '<div class="price-meta" style="margin-top:8px">Осталось проверок: <b>' + checksLeft + '/' + data.checks_limit + '</b> на этой неделе · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">∞ PRO</span></div>'
       : "";
-    container.innerHTML = `
-      <div class="price-card">
-        <div class="price-card-name">${data.item_name}</div>
-        <div class="price-row">
-          <span class="price-label">Минимальная цена</span>
-          <span class="price-value main">${fmt(data.lowest)} ${data.symbol}</span>
-        </div>
-        <div class="price-row">
-          <span class="price-label">Медианная цена</span>
-          <span class="price-value">${fmt(data.median)} ${data.symbol}</span>
-        </div>
-        ${data.volume ? `<div class="price-meta">📦 Продано за 24ч: ${data.volume}</div>` : ""}
-        ${checksHtml}
-        <div class="price-actions">
-          <button class="btn btn-secondary" onclick="doSearch()">◀ Назад</button>
-          <button class="btn btn-secondary" onclick="addToWatchlistQuick('${itemName.replace(/'/g,"\\'")}')">⭐</button>
-          <button class="btn btn-gold" onclick="addToPortfolioQuick('${itemName.replace(/'/g,"\\'")}', ${data.lowest})">💼 Портфель</button>
-        </div>
-      </div>`;
-  } catch (e) {
-    if (e.message.includes("Лимит") || e.message.includes("лимит") || e.message.includes("429")) {
+    container.innerHTML = '<div class="price-card">' +
+      '<div class="price-card-name">' + data.item_name + '</div>' +
+      '<div class="price-row"><span class="price-label">Минимальная цена</span><span class="price-value main">' + fmt(data.lowest) + ' ' + data.symbol + '</span></div>' +
+      '<div class="price-row"><span class="price-label">Медианная цена</span><span class="price-value">' + fmt(data.median) + ' ' + data.symbol + '</span></div>' +
+      (data.volume ? '<div class="price-meta">Продано за 24ч: ' + data.volume + '</div>' : '') +
+      checksHtml +
+      '<div class="price-actions">' +
+      '<button class="btn btn-secondary" onclick="doSearch()">◀ Назад</button>' +
+      '<button class="btn btn-secondary" onclick="addToWatchlistQuick(\'' + itemName.replace(/'/g, "\\'") + '\')">⭐</button>' +
+      '<button class="btn btn-gold" onclick="addToPortfolioQuick(\'' + itemName.replace(/'/g, "\\'") + '\',' + data.lowest + ')">💼 Портфель</button>' +
+      '</div></div>';
+  }).catch(function(e) {
+    if (e.message.indexOf("Лимит") >= 0 || e.message.indexOf("лимит") >= 0 || e.message.indexOf("429") >= 0) {
       openLimitModal(e.message);
     } else {
-      container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
+      container.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><div>' + e.message + '</div></div>';
     }
-  }
+  });
 }
 
-// ── Watchlist ─────────────────────────────────────────────────────────────────
-
-async function loadWatchlist() {
-  const container = document.getElementById("watchlistContent");
-  container.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
-  try {
-    const data = await apiFetch("/api/watchlist");
-
-    let html = "";
+function loadWatchlist() {
+  var container = document.getElementById("watchlistContent");
+  container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  apiFetch("/api/watchlist").then(function(data) {
+    var html = "";
     if (!userIsPremium) {
-      const used = data.items.length;
-      const bonus = (window._meData && window._meData.bonus_watchlist) || 0;
-      const limit = 7 + bonus;
-      const maxFree = 10;
-      const canWatchAd = limit < maxFree;
-      const bonusNote = bonus > 0 ? ` (+${bonus} бонус)` : "";
+      var used = data.items.length;
+      var bonus = (window._meData && window._meData.bonus_watchlist) || 0;
+      var limit = 7 + bonus;
+      var maxFree = 10;
+      var canWatchAd = limit < maxFree;
+      var bonusNote = bonus > 0 ? " (+" + bonus + " бонус)" : "";
       if (used >= limit) {
-        html += `<div class="limit-banner">
-          <span style="font-size:22px">🔒</span>
-          <div class="limit-banner-text">Использовано ${used}/${limit}${bonusNote}.
-            ${canWatchAd ? `<br><span style="cursor:pointer;color:#c89b3c" onclick="openWatchlistLimitModal('')">📺 Реклама → +1 слот</span> ·` : ""}
-            <span style="cursor:pointer;color:#c89b3c" onclick="openPremiumModal()"> ⭐ Premium → безлимит</span>
-          </div>
-        </div>`;
+        html += '<div class="limit-banner"><span style="font-size:22px">🔒</span><div class="limit-banner-text">Использовано ' + used + '/' + limit + bonusNote + '.' +
+          (canWatchAd ? ' <span style="cursor:pointer;color:#c89b3c" onclick="openWatchlistLimitModal(\'\')">📺 Реклама → +1 слот</span> ·' : '') +
+          ' <span style="cursor:pointer;color:#c89b3c" onclick="openPremiumModal()">⭐ Premium → безлимит</span></div></div>';
       } else {
-        html += `<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">
-          Слотов: ${used}/${limit}${bonusNote}
-          ${canWatchAd ? ` · <span style="color:var(--gold);cursor:pointer" onclick="openWatchlistLimitModal('')">📺 +1 слот за рекламу</span>` : ""}
-          · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">∞ Premium</span>
-        </div>`;
+        html += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Слотов: ' + used + '/' + limit + bonusNote +
+          (canWatchAd ? ' · <span style="color:var(--gold);cursor:pointer" onclick="openWatchlistLimitModal(\'\')">📺 +1 слот за рекламу</span>' : '') +
+          ' · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">∞ Premium</span></div>';
       }
     }
-
     if (!data.items.length) {
-      html += `<div class="empty-state"><div class="emoji">⭐</div><div>Вотчлист пуст</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>`;
+      html += '<div class="empty-state"><div class="emoji">⭐</div><div>Избранное пусто</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>';
     } else {
-      html += data.items.map(item => {
-        const belowThreshold = item.threshold > 0 && item.current_price && item.current_price <= item.threshold;
-        const aboveHigh = item.threshold_high > 0 && item.current_price && item.current_price >= item.threshold_high;
-        return `<div class="item-card">
-          <div class="item-card-header">
-            <div class="item-card-name">${item.item_name}</div>
-            <button class="item-card-delete" onclick="deleteWatchlistItem(${item.id})">×</button>
-          </div>
-          <div class="item-card-row">
-            <span class="item-card-label">Текущая цена</span>
-            <span class="item-card-value ${belowThreshold ? "threshold-below" : aboveHigh ? "profit-positive" : ""}">
-              ${item.current_price ? fmt(item.current_price) + " " + item.symbol : "—"}
-            </span>
-          </div>
-          ${item.threshold > 0 ? `<div class="item-card-row">
-            <span class="item-card-label">📉 Порог снижения</span>
-            <span class="item-card-value">${fmt(item.threshold)} ${item.symbol}</span>
-          </div>` : ""}
-          ${item.threshold_high > 0 ? `<div class="item-card-row">
-            <span class="item-card-label">📈 Порог роста</span>
-            <span class="item-card-value">${fmt(item.threshold_high)} ${item.symbol}</span>
-          </div>` : ""}
-          ${!item.threshold && !item.threshold_high ? `<div class="item-card-row"><span class="item-card-label">Уведомления</span><span class="item-card-value" style="color:var(--text-dim)">Без порогов</span></div>` : ""}
-          ${belowThreshold ? `<div style="font-size:12px;color:var(--green);margin-top:6px">📉 Цена достигла порога снижения!</div>` : ""}
-          ${aboveHigh ? `<div style="font-size:12px;color:var(--green);margin-top:6px">📈 Цена достигла порога роста!</div>` : ""}
-        </div>`;
+      html += data.items.map(function(item) {
+        var belowThreshold = item.threshold > 0 && item.current_price && item.current_price <= item.threshold;
+        var aboveHigh = item.threshold_high > 0 && item.current_price && item.current_price >= item.threshold_high;
+        return '<div class="item-card">' +
+          '<div class="item-card-header"><div class="item-card-name">' + item.item_name + '</div><button class="item-card-delete" onclick="deleteWatchlistItem(' + item.id + ')">×</button></div>' +
+          '<div class="item-card-row"><span class="item-card-label">Текущая цена</span><span class="item-card-value ' + (belowThreshold ? "threshold-below" : aboveHigh ? "profit-positive" : "") + '">' + (item.current_price ? fmt(item.current_price) + " " + item.symbol : "—") + '</span></div>' +
+          (item.threshold > 0 ? '<div class="item-card-row"><span class="item-card-label">📉 Порог снижения</span><span class="item-card-value">' + fmt(item.threshold) + ' ' + item.symbol + '</span></div>' : '') +
+          (item.threshold_high > 0 ? '<div class="item-card-row"><span class="item-card-label">📈 Порог роста</span><span class="item-card-value">' + fmt(item.threshold_high) + ' ' + item.symbol + '</span></div>' : '') +
+          (!item.threshold && !item.threshold_high ? '<div class="item-card-row"><span class="item-card-label">Уведомления</span><span class="item-card-value" style="color:var(--text-dim)">Без порогов</span></div>' : '') +
+          (belowThreshold ? '<div style="font-size:12px;color:var(--green);margin-top:6px">📉 Цена достигла порога снижения!</div>' : '') +
+          (aboveHigh ? '<div style="font-size:12px;color:var(--green);margin-top:6px">📈 Цена достигла порога роста!</div>' : '') +
+          '</div>';
       }).join("");
     }
     container.innerHTML = html;
-  } catch (e) {
-    container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
-  }
+  }).catch(function(e) {
+    container.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><div>' + e.message + '</div></div>';
+  });
 }
 
-async function deleteWatchlistItem(id) {
-  try {
-    await apiFetch(`/api/watchlist/${id}`, { method: "DELETE" });
-    showToast("Удалено из Избранноеа");
+function deleteWatchlistItem(id) {
+  apiFetch("/api/watchlist/" + id, { method: "DELETE" }).then(function() {
+    showToast("Удалено из Избранного");
     loadWatchlist();
-  } catch (e) { showToast(e.message); }
+  }).catch(function(e) { showToast(e.message); });
 }
 
-// ── Portfolio ─────────────────────────────────────────────────────────────────
-
-async function loadPortfolio() {
-  const container = document.getElementById("portfolioContent");
-  container.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
-  try {
-    const data = await apiFetch("/api/portfolio");
-
-    let html = "";
+function loadPortfolio() {
+  var container = document.getElementById("portfolioContent");
+  container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  apiFetch("/api/portfolio").then(function(data) {
+    var html = "";
     if (!userIsPremium) {
-      const used = data.items.length;
-      const limit = 5;
+      var used = data.items.length;
+      var limit = 5;
       if (used >= limit) {
-        html += `<div class="limit-banner" onclick="openPremiumModal()">
-          <span style="font-size:22px">🔒</span>
-          <div class="limit-banner-text">Использовано ${used}/${limit} мест. Оформи Premium для безлимитного портфеля.</div>
-          <button class="limit-banner-btn">⭐ PRO</button>
-        </div>`;
+        html += '<div class="limit-banner" onclick="openPremiumModal()"><span style="font-size:22px">🔒</span><div class="limit-banner-text">Использовано ' + used + '/' + limit + ' мест. Оформи Premium для безлимитного портфеля.</div><button class="limit-banner-btn">⭐ PRO</button></div>';
       } else {
-        html += `<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Использовано ${used}/${limit} мест · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">Получить безлимит ⭐</span></div>`;
+        html += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Использовано ' + used + '/' + limit + ' мест · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">Получить безлимит ⭐</span></div>';
       }
     }
-
     if (!data.items.length) {
-      html += `<div class="empty-state"><div class="emoji">💼</div><div>Портфель пуст</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>`;
+      html += '<div class="empty-state"><div class="emoji">💼</div><div>Портфель пуст</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>';
     } else {
-      const totalProfit = data.total_profit;
-      const profitClass = totalProfit >= 0 ? "profit-positive" : "profit-negative";
-      const profitSign = totalProfit >= 0 ? "+" : "";
-      html += `<div class="portfolio-summary">
-        <div class="summary-block">
-          <div class="summary-label">Вложено</div>
-          <div class="summary-value">${fmt(data.total_buy)} ${data.symbol}</div>
-        </div>
-        <div class="summary-block">
-          <div class="summary-label">Сейчас</div>
-          <div class="summary-value">${data.total_now ? fmt(data.total_now) + " " + data.symbol : "—"}</div>
-        </div>
-        <div class="summary-block">
-          <div class="summary-label">Прибыль</div>
-          <div class="summary-value ${profitClass}">${totalProfit != null ? profitSign + fmt(totalProfit) : "—"}</div>
-        </div>
-      </div>`;
-      html += data.items.map(item => {
-        const pc = item.profit >= 0 ? "profit-positive" : "profit-negative";
-        const s = item.profit >= 0 ? "+" : "";
-        return `<div class="item-card">
-          <div class="item-card-header">
-            <div class="item-card-name">${item.item_name}</div>
-            <button class="item-card-delete" onclick="deletePortfolioItem(${item.id})">×</button>
-          </div>
-          <div class="item-card-row">
-            <span class="item-card-label">Куплено за</span>
-            <span class="item-card-value">${fmt(item.buy_price)} ${item.symbol}</span>
-          </div>
-          <div class="item-card-row">
-            <span class="item-card-label">Сейчас</span>
-            <span class="item-card-value">${item.current_price ? fmt(item.current_price) + " " + item.symbol : "—"}</span>
-          </div>
-          ${item.profit != null ? `<div class="item-card-row">
-            <span class="item-card-label">Прибыль</span>
-            <span class="item-card-value ${pc}">${s}${fmt(item.profit)} ${item.symbol} (${s}${item.profit_pct.toFixed(1)}%)</span>
-          </div>` : ""}
-        </div>`;
+      var totalProfit = data.total_profit;
+      var profitClass = totalProfit >= 0 ? "profit-positive" : "profit-negative";
+      var profitSign = totalProfit >= 0 ? "+" : "";
+      html += '<div class="portfolio-summary">' +
+        '<div class="summary-block"><div class="summary-label">Вложено</div><div class="summary-value">' + fmt(data.total_buy) + ' ' + data.symbol + '</div></div>' +
+        '<div class="summary-block"><div class="summary-label">Сейчас</div><div class="summary-value">' + (data.total_now ? fmt(data.total_now) + ' ' + data.symbol : '—') + '</div></div>' +
+        '<div class="summary-block"><div class="summary-label">Прибыль</div><div class="summary-value ' + profitClass + '">' + (totalProfit != null ? profitSign + fmt(totalProfit) : '—') + '</div></div>' +
+        '</div>';
+      html += data.items.map(function(item) {
+        var pc = item.profit >= 0 ? "profit-positive" : "profit-negative";
+        var s = item.profit >= 0 ? "+" : "";
+        return '<div class="item-card">' +
+          '<div class="item-card-header"><div class="item-card-name">' + item.item_name + '</div><button class="item-card-delete" onclick="deletePortfolioItem(' + item.id + ')">×</button></div>' +
+          '<div class="item-card-row"><span class="item-card-label">Куплено за</span><span class="item-card-value">' + fmt(item.buy_price) + ' ' + item.symbol + '</span></div>' +
+          '<div class="item-card-row"><span class="item-card-label">Сейчас</span><span class="item-card-value">' + (item.current_price ? fmt(item.current_price) + ' ' + item.symbol : '—') + '</span></div>' +
+          (item.profit != null ? '<div class="item-card-row"><span class="item-card-label">Прибыль</span><span class="item-card-value ' + pc + '">' + s + fmt(item.profit) + ' ' + item.symbol + ' (' + s + item.profit_pct.toFixed(1) + '%)</span></div>' : '') +
+          '</div>';
       }).join("");
     }
     container.innerHTML = html;
-  } catch (e) {
-    container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><div>${e.message}</div></div>`;
-  }
+  }).catch(function(e) {
+    container.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><div>' + e.message + '</div></div>';
+  });
 }
 
-async function deletePortfolioItem(id) {
-  try {
-    await apiFetch(`/api/portfolio/${id}`, { method: "DELETE" });
+function deletePortfolioItem(id) {
+  apiFetch("/api/portfolio/" + id, { method: "DELETE" }).then(function() {
     showToast("Удалено из портфеля");
     loadPortfolio();
-  } catch (e) { showToast(e.message); }
+  }).catch(function(e) { showToast(e.message); });
 }
 
-// ── Chart ─────────────────────────────────────────────────────────────────────
-
-async function doChartSearch() {
-  const q = document.getElementById("chartSearchInput").value.trim();
+function doChartSearch() {
+  var q = document.getElementById("chartSearchInput").value.trim();
   if (!q) return;
-  const container = document.getElementById("chartSearchResults");
-  container.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
-  try {
-    const data = await apiFetch(`/api/search?q=${encodeURIComponent(q)}`);
+  var container = document.getElementById("chartSearchResults");
+  container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  apiFetch("/api/search?q=" + encodeURIComponent(q)).then(function(data) {
     if (!data.results.length) {
-      container.innerHTML = `<div class="empty-state"><div>Ничего не найдено</div></div>`;
+      container.innerHTML = '<div class="empty-state"><div>Ничего не найдено</div></div>';
       return;
     }
-    container.innerHTML = `<div class="results-list" style="margin-bottom:12px">` +
-      data.results.map(item => {
-        const name = item.name || item;
-        return `<div class="result-item" onclick="loadChart('${name.replace(/'/g,"\\'")}')">
-          <span class="result-name">${name}</span><span class="result-arrow">›</span>
-        </div>`;
-      }).join("") + `</div>`;
-  } catch (e) {
-    container.innerHTML = `<div class="empty-state"><div>${e.message}</div></div>`;
-  }
+    container.innerHTML = '<div class="results-list" style="margin-bottom:12px">' +
+      data.results.map(function(item) {
+        var name = item.name || item;
+        return '<div class="result-item" onclick="loadChart(\'' + name.replace(/'/g, "\\'") + '\')"><span class="result-name">' + name + '</span><span class="result-arrow">›</span></div>';
+      }).join("") + '</div>';
+  }).catch(function(e) {
+    container.innerHTML = '<div class="empty-state"><div>' + e.message + '</div></div>';
+  });
 }
 
-async function loadChart(itemName) {
+function loadChart(itemName) {
   document.getElementById("chartSearchResults").innerHTML = "";
-  const container = document.getElementById("chartContainer");
+  var container = document.getElementById("chartContainer");
   container.style.display = "block";
   document.getElementById("chartTitle").textContent = itemName;
-
-  try {
-    const data = await apiFetch(`/api/history?item=${encodeURIComponent(itemName)}`);
+  apiFetch("/api/history?item=" + encodeURIComponent(itemName)).then(function(data) {
     if (!data.history.length) {
-      container.innerHTML = `<div class="empty-state"><div class="emoji">📈</div><div>История пока пуста</div><div style="font-size:12px;margin-top:6px">Данные накапливаются при каждом запросе цены</div></div>`;
+      container.innerHTML = '<div class="empty-state"><div class="emoji">📈</div><div>История пока пуста</div></div>';
       return;
     }
-    const labels = data.history.map(h => {
-      const d = new Date(h.date);
-      return `${d.getDate()}.${String(d.getMonth()+1).padStart(2,"0")}`;
+    var labels = data.history.map(function(h) {
+      var d = new Date(h.date);
+      return d.getDate() + "." + String(d.getMonth()+1).padStart(2,"0");
     });
-    const prices = data.history.map(h => h.price);
+    var prices = data.history.map(function(h) { return h.price; });
     if (chartInstance) chartInstance.destroy();
-    const ctx = document.getElementById("priceChart").getContext("2d");
+    var ctx = document.getElementById("priceChart").getContext("2d");
     chartInstance = new Chart(ctx, {
       type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: "Цена", data: prices,
-          borderColor: "#c89b3c", backgroundColor: "rgba(200,155,60,0.1)",
-          borderWidth: 2, pointRadius: 3, pointBackgroundColor: "#c89b3c",
-          fill: true, tension: 0.3,
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { color: "#888899", font: { size: 11 } }, grid: { color: "#2a2a3e" } },
-          y: { ticks: { color: "#888899", font: { size: 11 } }, grid: { color: "#2a2a3e" } }
-        }
-      }
+      data: { labels: labels, datasets: [{ label: "Цена", data: prices, borderColor: "#c89b3c", backgroundColor: "rgba(200,155,60,0.1)", borderWidth: 2, pointRadius: 3, pointBackgroundColor: "#c89b3c", fill: true, tension: 0.3 }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: "#888899", font: { size: 11 } }, grid: { color: "#2a2a3e" } }, y: { ticks: { color: "#888899", font: { size: 11 } }, grid: { color: "#2a2a3e" } } } }
     });
-  } catch (e) {
-    container.innerHTML = `<div class="empty-state"><div>${e.message}</div></div>`;
-  }
+  }).catch(function(e) {
+    container.innerHTML = '<div class="empty-state"><div>' + e.message + '</div></div>';
+  });
 }
-
-// ── Add modal ─────────────────────────────────────────────────────────────────
 
 function openAddModal() {
   addModalSelectedItem = null;
-  document.getElementById("addModalTitle").textContent =
-    addModalMode === "watchlist" ? "Добавить в Избранное" : "Добавить в портфель";
+  document.getElementById("addModalTitle").textContent = addModalMode === "watchlist" ? "Добавить в Избранное" : "Добавить в портфель";
   document.getElementById("addModalSearch").value = "";
   document.getElementById("addModalResults").innerHTML = "";
   document.getElementById("addModalSearchBox").style.display = "block";
   document.getElementById("addModalForm").style.display = "none";
   document.getElementById("addModalSearchButtons").style.display = "flex";
   document.getElementById("addModal").classList.add("open");
-  setTimeout(() => document.getElementById("addModalSearch").focus(), 100);
+  setTimeout(function() { document.getElementById("addModalSearch").focus(); }, 100);
 }
 
-function closeAddModal() {
-  document.getElementById("addModal").classList.remove("open");
-}
+function closeAddModal() { document.getElementById("addModal").classList.remove("open"); }
 
-async function doModalSearch() {
-  const q = document.getElementById("addModalSearch").value.trim();
+function doModalSearch() {
+  var q = document.getElementById("addModalSearch").value.trim();
   if (!q) return;
-  const container = document.getElementById("addModalResults");
-  container.innerHTML = `<div class="loading" style="padding:10px"><div class="spinner" style="width:16px;height:16px;margin:0 auto 4px"></div></div>`;
-  try {
-    const data = await apiFetch(`/api/search?q=${encodeURIComponent(q)}`);
+  var container = document.getElementById("addModalResults");
+  container.innerHTML = '<div class="loading" style="padding:10px"><div class="spinner" style="width:16px;height:16px;margin:0 auto 4px"></div></div>';
+  apiFetch("/api/search?q=" + encodeURIComponent(q)).then(function(data) {
     if (!data.results.length) {
-      container.innerHTML = `<div style="color:var(--text-dim);font-size:13px;padding:8px 0">Ничего не найдено</div>`;
+      container.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:8px 0">Ничего не найдено</div>';
       return;
     }
-    container.innerHTML = `<div class="results-list" style="margin-top:8px;max-height:200px;overflow-y:auto">` +
-      data.results.map(item => {
-        const name = item.name || item;
-        const imgHtml = item.icon ? `<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/${item.icon}/62fx62f" alt="" loading="lazy" onerror="this.style.display='none'">` : "";
-        return `<div class="result-item" onclick="selectModalItem('${name.replace(/'/g,"\\'")}')">
-          ${imgHtml}<span class="result-name" style="font-size:13px">${name}</span>
-        </div>`;
-      }).join("") + `</div>`;
-  } catch (e) {
-    container.innerHTML = `<div style="color:var(--red);font-size:13px">${e.message}</div>`;
-  }
+    container.innerHTML = '<div class="results-list" style="margin-top:8px;max-height:200px;overflow-y:auto">' +
+      data.results.map(function(item) {
+        var name = item.name || item;
+        var imgHtml = item.icon ? '<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/' + item.icon + '/62fx62f" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : "";
+        return '<div class="result-item" onclick="selectModalItem(\'' + name.replace(/'/g, "\\'") + '\')">' + imgHtml + '<span class="result-name" style="font-size:13px">' + name + '</span></div>';
+      }).join("") + '</div>';
+  }).catch(function(e) {
+    container.innerHTML = '<div style="color:var(--red);font-size:13px">' + e.message + '</div>';
+  });
 }
 
 function selectModalItem(itemName) {
@@ -1092,155 +750,114 @@ function selectModalItem(itemName) {
   document.getElementById("addModalSearchBox").style.display = "none";
   document.getElementById("addModalSearchButtons").style.display = "none";
   document.getElementById("addModalItemName").textContent = itemName;
-
   if (addModalMode === "watchlist") {
     document.getElementById("addModalWatchlistFields").style.display = "block";
     document.getElementById("addModalPortfolioField").style.display = "none";
     document.getElementById("addModalValueLow").value = "";
     document.getElementById("addModalValueHigh").value = "";
-    document.getElementById("addModalHint").textContent =
-      "Оба порога необязательны. Оставь 0 если не нужно уведомление для этого направления.";
+    document.getElementById("addModalHint").textContent = "Оба порога необязательны. Оставь 0 если не нужно уведомление для этого направления.";
   } else {
     document.getElementById("addModalWatchlistFields").style.display = "none";
     document.getElementById("addModalPortfolioField").style.display = "block";
     document.getElementById("addModalValue").value = "";
     document.getElementById("addModalValue").placeholder = "Например: 1200.50";
-    document.getElementById("addModalHint").textContent =
-      "Укажи цену покупки — бот будет считать прибыль/убыток относительно текущей цены.";
+    document.getElementById("addModalHint").textContent = "Укажи цену покупки — бот будет считать прибыль/убыток относительно текущей цены.";
   }
-
   document.getElementById("addModalForm").style.display = "block";
-  setTimeout(() => {
-    const f = addModalMode === "watchlist"
-      ? document.getElementById("addModalValueLow")
-      : document.getElementById("addModalValue");
+  setTimeout(function() {
+    var f = addModalMode === "watchlist" ? document.getElementById("addModalValueLow") : document.getElementById("addModalValue");
     f.focus();
   }, 100);
 }
 
-async function submitAdd() {
+function submitAdd() {
   if (!addModalSelectedItem) return;
-
-  try {
-    if (addModalMode === "watchlist") {
-      const tLow = parseFloat(document.getElementById("addModalValueLow").value) || 0;
-      const tHigh = parseFloat(document.getElementById("addModalValueHigh").value) || 0;
-      await apiFetch("/api/watchlist", {
-        method: "POST",
-        body: JSON.stringify({
-          item_name: addModalSelectedItem,
-          threshold: tLow,
-          threshold_high: tHigh > 0 ? tHigh : null,
-        }),
-      });
+  if (addModalMode === "watchlist") {
+    var tLow = parseFloat(document.getElementById("addModalValueLow").value) || 0;
+    var tHigh = parseFloat(document.getElementById("addModalValueHigh").value) || 0;
+    apiFetch("/api/watchlist", { method: "POST", body: JSON.stringify({ item_name: addModalSelectedItem, threshold: tLow, threshold_high: tHigh > 0 ? tHigh : null }) }).then(function() {
       showToast("Добавлено в Избранное ⭐");
       closeAddModal();
       loadWatchlist();
-    } else {
-      const val = parseFloat(document.getElementById("addModalValue").value) || 0;
-      if (val <= 0) { showToast("Введи цену покупки"); return; }
-      await apiFetch("/api/portfolio", {
-        method: "POST",
-        body: JSON.stringify({ item_name: addModalSelectedItem, buy_price: val }),
-      });
+    }).catch(function(e) {
+      if (e.message.indexOf("лимит") >= 0 || e.message.indexOf("Достигнут") >= 0) {
+        closeAddModal(); openWatchlistLimitModal(e.message);
+      } else if (e.message.indexOf("Premium") >= 0 || e.message.indexOf("Бесплатный") >= 0) {
+        closeAddModal(); openPremiumModal();
+      } else { showToast(e.message); }
+    });
+  } else {
+    var val = parseFloat(document.getElementById("addModalValue").value) || 0;
+    if (val <= 0) { showToast("Введи цену покупки"); return; }
+    apiFetch("/api/portfolio", { method: "POST", body: JSON.stringify({ item_name: addModalSelectedItem, buy_price: val }) }).then(function() {
       showToast("Добавлено в портфель 💼");
       closeAddModal();
       loadPortfolio();
-    }
-  } catch (e) {
-    if (e.message.includes("лимит") || e.message.includes("Достигнут")) {
-      closeAddModal();
-      openWatchlistLimitModal(e.message);
-    } else if (e.message.includes("Premium") || e.message.includes("Бесплатный")) {
-      closeAddModal();
-      openPremiumModal();
-    } else {
-      showToast(e.message);
-    }
-  }
-}
-
-function inviteFriend() {
-  const userId = window._meData && window._meData.user && window._meData.user.id;
-  if (!userId) { showToast("Сначала открой приложение через Telegram"); return; }
-  const link = `https://t.me/Dota2PriceBot?start=ref_${userId}`;
-  const text = `🎮 Dota 2 Price Tracker — проверяй цены скинов прямо в Telegram!\n${link}`;
-  if (tg.openTelegramLink) {
-    tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("🎮 Dota 2 Price Tracker — цены скинов в Telegram!")}`);
-  } else {
-    showToast("Ссылка: " + link);
+    }).catch(function(e) {
+      if (e.message.indexOf("Premium") >= 0 || e.message.indexOf("Бесплатный") >= 0) {
+        closeAddModal(); openPremiumModal();
+      } else { showToast(e.message); }
+    });
   }
 }
 
 function addToWatchlistQuick(itemName) {
   addModalMode = "watchlist";
   openAddModal();
-  setTimeout(() => selectModalItem(itemName), 50);
+  setTimeout(function() { selectModalItem(itemName); }, 50);
 }
 
 function addToPortfolioQuick(itemName, price) {
   addModalMode = "portfolio";
   openAddModal();
-  setTimeout(() => {
+  setTimeout(function() {
     selectModalItem(itemName);
-    setTimeout(() => { document.getElementById("addModalValue").value = price; }, 50);
+    setTimeout(function() { document.getElementById("addModalValue").value = price; }, 50);
   }, 50);
 }
 
-// ── Adsgram ───────────────────────────────────────────────────────────────────
-
-async function initAdsgram() {
+function initAdsgram() {
   try {
     if (typeof window.Adsgram === "undefined") {
-      console.warn("Adsgram not loaded yet, retrying...");
       setTimeout(initAdsgram, 2000);
       return;
     }
-    adController = await window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
-    console.log("Adsgram initialized");
+    window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID }).then(function(ctrl) {
+      adController = ctrl;
+    }).catch(function(e) {
+      console.warn("Adsgram init failed:", e);
+    });
   } catch(e) {
-    console.warn("Adsgram init failed:", e);
+    console.warn("Adsgram error:", e);
   }
 }
-
-// ── Adsgram & лимит ───────────────────────────────────────────────────────────
 
 function openLimitModal(msg) {
-  document.getElementById("limitModalText").textContent = msg ||
-    "Лимит проверок цены на этой неделе исчерпан. Посмотри рекламу чтобы получить +3 проверки, или оформи Premium.";
+  document.getElementById("limitModalText").textContent = msg || "Лимит проверок цены на этой неделе исчерпан. Посмотри рекламу чтобы получить +3 проверки, или оформи Premium.";
+  var btn = document.getElementById("watchAdBtn");
+  btn.textContent = "📺 Смотреть рекламу (+3 проверки)";
+  btn.onclick = function() { watchAdForReward("price_checks"); };
   document.getElementById("limitModal").classList.add("open");
 }
 
-function closeLimitModal() {
-  document.getElementById("limitModal").classList.remove("open");
-}
+function closeLimitModal() { document.getElementById("limitModal").classList.remove("open"); }
 
 function openWatchlistLimitModal(msg) {
-  // Для лимита Избранноеа открываем тот же модал но с другой кнопкой рекламы
-  const btn = document.getElementById("watchAdBtn");
-  btn.textContent = "📺 Смотреть рекламу (+1 слот Избранноеа)";
-  btn.onclick = () => watchAdForReward("watchlist");
-  document.getElementById("limitModalText").textContent = msg ||
-    "Достигнут лимит Избранноеа. Посмотри рекламу (+1 слот) или оформи Premium.";
+  var btn = document.getElementById("watchAdBtn");
+  btn.textContent = "📺 Смотреть рекламу (+1 слот Избранного)";
+  btn.onclick = function() { watchAdForReward("watchlist"); };
+  document.getElementById("limitModalText").textContent = msg || "Достигнут лимит Избранного. Посмотри рекламу (+1 слот) или оформи Premium.";
   document.getElementById("limitModal").classList.add("open");
 }
 
-async function watchAdForReward(rewardType) {
-  if (!adController) {
-    showToast("Реклама временно недоступна");
-    return;
-  }
-  try {
-    closeLimitModal();
-    showToast("⏳ Загружаю рекламу...");
-    await adController.show();
-    // Реклама просмотрена — начисляем бонус
-    const result = await apiFetch("/api/ad-reward", {
-      method: "POST",
-      body: JSON.stringify({ reward_type: rewardType }),
-    });
-    showToast("✅ " + result.message);
-    // Обновляем данные в памяти
+function watchAdForReward(rewardType) {
+  if (!adController) { showToast("Реклама временно недоступна"); return; }
+  closeLimitModal();
+  showToast("Загружаю рекламу...");
+  adController.show().then(function() {
+    return apiFetch("/api/ad-reward", { method: "POST", body: JSON.stringify({ reward_type: rewardType }) });
+  }).then(function(result) {
+    showToast(result.message || "Бонус начислен!");
     if (rewardType === "price_checks" && window._meData) {
       window._meData.checks_left = result.checks_left;
       window._meData.checks_limit = result.checks_limit;
@@ -1250,88 +867,69 @@ async function watchAdForReward(rewardType) {
       window._meData.watchlist_limit = result.watchlist_limit;
       loadWatchlist();
     }
-  } catch(e) {
-    // Пользователь закрыл рекламу или ошибка
+  }).catch(function(e) {
     if (e && e.done === false) {
       showToast("Нужно досмотреть рекламу до конца");
     } else {
       showToast(e.message || "Ошибка загрузки рекламы");
     }
-  }
+  });
 }
-
-// ── Premium ───────────────────────────────────────────────────────────────────
 
 function openPremiumModal() { document.getElementById("premiumModal").classList.add("open"); }
 function closePremiumModal() { document.getElementById("premiumModal").classList.remove("open"); }
-
-function buyPremium() {
-  closePremiumModal();
-  // Открываем бота для оплаты через Stars
-  tg.openTelegramLink("https://t.me/Dota2PriceBot?start=premium");
-}
-
-// ── Currency ──────────────────────────────────────────────────────────────────
+function buyPremium() { closePremiumModal(); tg.openTelegramLink("https://t.me/Dota2PriceBot?start=premium"); }
 
 function renderCurrencyList(currencies) {
-  const list = document.getElementById("currencyList");
-  list.innerHTML = currencies.map(c => `
-    <div class="currency-option ${c.code === currentCurrency ? "selected" : ""}"
-      onclick="selectCurrency('${c.code}', '${c.symbol}', this)">
-      <span class="currency-option-name">${c.name}</span>
-      <span>
-        <span class="currency-option-sym">${c.symbol}</span>
-        ${c.code === currentCurrency ? '<span class="currency-check">✓</span>' : ''}
-      </span>
-    </div>`).join("");
+  var list = document.getElementById("currencyList");
+  list.innerHTML = currencies.map(function(c) {
+    return '<div class="currency-option ' + (c.code === currentCurrency ? "selected" : "") + '" onclick="selectCurrency(\'' + c.code + '\',\'' + c.symbol + '\',this)">' +
+      '<span class="currency-option-name">' + c.name + '</span>' +
+      '<span><span class="currency-option-sym">' + c.symbol + '</span>' +
+      (c.code === currentCurrency ? '<span class="currency-check">✓</span>' : '') +
+      '</span></div>';
+  }).join("");
 }
 
-async function selectCurrency(code, symbol, el) {
-  try {
-    await apiFetch("/api/settings/currency", {
-      method: "POST",
-      body: JSON.stringify({ currency: code }),
-    });
+function selectCurrency(code, symbol, el) {
+  apiFetch("/api/settings/currency", { method: "POST", body: JSON.stringify({ currency: code }) }).then(function() {
     currentCurrency = code;
     currentSymbol = symbol;
     document.getElementById("currencyBadge").textContent = code;
-    document.querySelectorAll(".currency-option").forEach(o => {
+    document.querySelectorAll(".currency-option").forEach(function(o) {
       o.classList.remove("selected");
-      var chk = o.querySelector(".currency-check"); if (chk) chk.remove();
+      var chk = o.querySelector(".currency-check");
+      if (chk) chk.parentNode.removeChild(chk);
     });
     el.classList.add("selected");
     closeCurrencyModal();
-    showToast(`Валюта: ${code}`);
-  } catch (e) { showToast(e.message); }
+    showToast("Валюта: " + code);
+  }).catch(function(e) { showToast(e.message); });
 }
 
 function openCurrencyModal() { document.getElementById("currencyModal").classList.add("open"); }
 function closeCurrencyModal() { document.getElementById("currencyModal").classList.remove("open"); }
 
-// Закрытие модалок по клику на overlay
-["addModal","currencyModal","premiumModal","limitModal"].forEach(id => {
+["addModal","currencyModal","premiumModal","limitModal"].forEach(function(id) {
   document.getElementById(id).addEventListener("click", function(e) {
     if (e.target === this) this.classList.remove("open");
   });
 });
-
-// ── Utils ─────────────────────────────────────────────────────────────────────
 
 function fmt(n) {
   if (n == null) return "—";
   return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-let toastTimer;
+var toastTimer;
 function showToast(msg) {
-  const t = document.getElementById("toast");
+  var t = document.getElementById("toast");
   t.textContent = msg;
   t.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
+  toastTimer = setTimeout(function() { t.classList.remove("show"); }, 2500);
 }
 
-// ── Start ─────────────────────────────────────────────────────────────────────
 init();
 </script>
 </body>
