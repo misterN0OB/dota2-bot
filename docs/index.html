@@ -949,22 +949,24 @@ function watchAdForReward(rewardType) {
 }
 
 function openPremiumModal() {
-  // Если уже Premium — показываем сообщение вместо модала
-  if (userIsPremium) {
-    showToast("У тебя уже есть Premium! ⭐");
-    return;
-  }
+  if (userIsPremium) { showToast("У тебя уже есть Premium! ⭐"); return; }
   document.getElementById("premiumModal").classList.add("open");
 }
 function closePremiumModal() { document.getElementById("premiumModal").classList.remove("open"); }
 function buyPremium() {
   closePremiumModal();
-  try {
-    tg.openTelegramLink("https://t.me/Dota2PriceBot?start=premium");
-  } catch(e) {
-    // Fallback для случаев когда openTelegramLink недоступен
-    tg.openLink("https://t.me/Dota2PriceBot?start=premium");
-  }
+  showToast("⏳ Создаю инвойс...");
+  apiFetch("/api/buy-premium", { method: "POST" }).then(function(result) {
+    if (result.already_premium) {
+      showToast("У тебя уже есть Premium! ⭐");
+    } else {
+      showToast("✅ Инвойс отправлен в чат!");
+      // Закрываем мини-апп через 1.5 сек чтобы пользователь увидел инвойс в боте
+      setTimeout(function() { tg.close(); }, 1500);
+    }
+  }).catch(function(e) {
+    showToast("Ошибка: " + (e.message || "попробуй снова"));
+  });
 }
 
 function renderCurrencyList(currencies) {

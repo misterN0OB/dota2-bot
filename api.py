@@ -8,6 +8,7 @@ import hmac
 import json
 import time
 import logging
+import requests as req_lib
 from urllib.parse import unquote, parse_qs
 
 from fastapi import FastAPI, HTTPException, Depends, Query
@@ -501,6 +502,41 @@ def get_premium_status(user: dict = Depends(get_current_user)):
         "watchlist_limit": None if premium else FREE_WATCHLIST_LIMIT,
         "portfolio_limit": None if premium else FREE_PORTFOLIO_LIMIT,
     }
+
+
+@app.post("/api/buy-premium")
+def buy_premium_endpoint(user: dict = Depends(get_current_user)):
+    """Отправляет Stars-инвойс напрямую в чат пользователя через Bot API."""
+    user_id = user["id"]
+    if is_premium(user_id):
+        return {"ok": True, "already_premium": True, "message": "У тебя уже есть Premium! ⭐"}
+    try:
+        resp = req_lib.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendInvoice",
+            json={
+                "chat_id": user_id,
+                "title": "Dota 2 Tracker Premium",
+                "description": (
+                    "✅ Безлимитные проверки цены\n"
+                    "✅ Безлимитное Избранное\n"
+                    "✅ Безлимитный портфель\n"
+                    "✅ Без рекламы"
+                ),
+                "payload": "premium_purchase",
+                "currency": "XTR",
+                "prices": [{"label": "Premium доступ", "amount": 200}],
+            },
+            timeout=10,
+        )
+        data = resp.json()
+        if data.get("ok"):
+            return {"ok": True, "message": "Инвойс отправлен! Открой чат с ботом."}
+        else:
+            logger.error("sendInvoice error: %s", data)
+            raise HTTPException(status_code=500, detail="Не удалось создать инвойс")
+    except req_lib.RequestException as e:
+        logger.error("sendInvoice request error: %s", e)
+        raise HTTPException(status_code=500, detail="Ошибка соединения с Telegram")
 
 
 @app.get("/health")
