@@ -1,4 +1,5 @@
 import re
+import time
 import logging
 import requests
 from urllib.parse import quote
@@ -60,6 +61,7 @@ def parse_price_value(price_str: str) -> float:
 def get_item_price(item_name: str, currency: str = "RUB") -> dict | None:
     """
     Возвращает словарь с ценами или None если предмет не найден / ошибка API.
+    Пробует до 3 раз с паузой при rate limit.
     """
     cur = CURRENCIES.get(currency, CURRENCIES["RUB"])
     params = {
@@ -67,31 +69,38 @@ def get_item_price(item_name: str, currency: str = "RUB") -> dict | None:
         "currency": cur["code"],
         "market_hash_name": item_name,
     }
-    try:
-        resp = requests.get(
-            STEAM_PRICE_URL, params=params, headers=HEADERS, timeout=10
-        )
-        resp.raise_for_status()
-        data = resp.json()
+    for attempt in range(3):
+        try:
+            if attempt > 0:
+                time.sleep(1.5)  # пауза перед повтором при rate limit
+            resp = requests.get(
+                STEAM_PRICE_URL, params=params, headers=HEADERS, timeout=10
+            )
+            # 429 = rate limit, пробуем ещё раз
+            if resp.status_code == 429:
+                logger.warning("Steam rate limit for '%s', attempt %d", item_name, attempt + 1)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
 
-        if not data.get("success"):
-            return None
+            if not data.get("success"):
+                return None
 
-        lowest = parse_price_value(data.get("lowest_price", ""))
-        median = parse_price_value(data.get("median_price", ""))
-        volume_raw = data.get("volume", "0").replace(",", "").replace(" ", "")
+            lowest = parse_price_value(data.get("lowest_price", ""))
+            median = parse_price_value(data.get("median_price", ""))
+            volume_raw = data.get("volume", "0").replace(",", "").replace(" ", "")
 
-        return {
-            "lowest": lowest,
-            "median": median,
-            "volume": int(volume_raw) if volume_raw.isdigit() else 0,
-            "symbol": cur["symbol"],
-            "currency": currency,
-            "item_name": item_name,
-        }
-    except Exception as e:
-        logger.warning("get_item_price error for '%s': %s", item_name, e)
-        return None
+            return {
+                "lowest": lowest,
+                "median": median,
+                "volume": int(volume_raw) if volume_raw.isdigit() else 0,
+                "symbol": cur["symbol"],
+                "currency": currency,
+                "item_name": item_name,
+            }
+        except Exception as e:
+            logger.warning("get_item_price error for '%s' attempt %d: %s", item_name, attempt + 1, e)
+    return None
 
 
 def search_items(query: str, count: int = 5) -> list[dict]:

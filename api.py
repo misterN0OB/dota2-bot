@@ -530,6 +530,23 @@ def buy_premium_endpoint(user: dict = Depends(get_current_user)):
         )
         data = resp.json()
         if data.get("ok"):
+            # Отправляем сообщение с кнопкой "Вернуться в трекер"
+            req_lib.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={
+                    "chat_id": user_id,
+                    "text": "После оплаты Premium активируется автоматически ✅",
+                    "reply_markup": {
+                        "inline_keyboard": [[
+                            {
+                                "text": "🚀 Вернуться в трекер",
+                                "web_app": {"url": "https://mistern0ob.github.io/dota2-bot/"}
+                            }
+                        ]]
+                    }
+                },
+                timeout=5,
+            )
             return {"ok": True, "message": "Инвойс отправлен! Открой чат с ботом."}
         else:
             logger.error("sendInvoice error: %s", data)

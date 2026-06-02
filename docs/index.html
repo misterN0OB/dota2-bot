@@ -350,6 +350,10 @@
   <div class="modal premium-modal">
     <div class="stars-icon">&#11088;</div>
     <div class="premium-title">Dota 2 Tracker Premium</div>
+    <div style="background:linear-gradient(135deg,#1a1a2e,#2a1a0a);border:1px solid #c89b3c44;border-radius:10px;padding:14px;margin:12px 0">
+      <div style="font-size:22px;font-weight:900;color:#e8c870;text-align:center;letter-spacing:1px">200 &#11088; Stars</div>
+      <div style="font-size:12px;color:var(--text-dim);text-align:center;margin-top:4px">Разовая оплата · Навсегда</div>
+    </div>
     <div class="premium-features">
       <div class="premium-feature"><span class="feat-icon">&#128269;</span> Безлимитные проверки цены</div>
       <div class="premium-feature"><span class="feat-icon">&#9854;</span> Безлимитное Избранное</div>
@@ -357,11 +361,9 @@
       <div class="premium-feature"><span class="feat-icon">&#128683;</span> Без рекламы</div>
       <div class="premium-feature"><span class="feat-icon">&#128200;</span> Уведомления о росте и снижении</div>
     </div>
-    <div class="premium-price">200 &#11088;</div>
-    <div class="premium-price-sub">Telegram Stars · Разовая оплата</div>
-    <div class="modal-buttons">
+    <div class="modal-buttons" style="flex-direction:column;gap:8px">
+      <button class="btn btn-stars" style="font-size:16px;padding:14px;font-weight:800" onclick="buyPremium()">&#11088; Купить Premium — 200 Stars</button>
       <button class="btn btn-secondary" onclick="closePremiumModal()">Закрыть</button>
-      <button class="btn btn-stars" onclick="buyPremium()">&#11088; Купить Premium</button>
     </div>
   </div>
 </div>
@@ -371,13 +373,13 @@
   <div class="modal" style="text-align:center">
     <div style="font-size:48px;margin-bottom:10px">&#128274;</div>
     <div class="modal-title" style="text-align:center">Лимит исчерпан</div>
-    <div class="modal-hint" id="limitModalText" style="margin-bottom:20px;font-size:14px;line-height:1.6"></div>
+    <div class="modal-hint" id="limitModalText" style="margin-bottom:16px;font-size:14px;line-height:1.6"></div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <button class="btn" id="watchAdBtn" style="background:linear-gradient(135deg,#2d6a4f,#40916c);color:#fff;font-size:15px;padding:14px" onclick="watchAdForReward('price_checks')">
         &#128250; Смотреть рекламу (+3 проверки)
       </button>
-      <button class="btn btn-stars" style="font-size:14px;padding:12px" onclick="closeLimitModal();openPremiumModal()">
-        &#11088; Оформить Premium — безлимит
+      <button class="btn btn-stars" style="font-size:15px;padding:14px;font-weight:800" onclick="closeLimitModal();openPremiumModal()">
+        &#11088; Premium — безлимит навсегда
       </button>
       <button class="btn btn-secondary" onclick="closeLimitModal()">Закрыть</button>
     </div>
