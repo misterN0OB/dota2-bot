@@ -948,9 +948,24 @@ function watchAdForReward(rewardType) {
   });
 }
 
-function openPremiumModal() { document.getElementById("premiumModal").classList.add("open"); }
+function openPremiumModal() {
+  // Если уже Premium — показываем сообщение вместо модала
+  if (userIsPremium) {
+    showToast("У тебя уже есть Premium! ⭐");
+    return;
+  }
+  document.getElementById("premiumModal").classList.add("open");
+}
 function closePremiumModal() { document.getElementById("premiumModal").classList.remove("open"); }
-function buyPremium() { closePremiumModal(); tg.openTelegramLink("https://t.me/Dota2PriceBot?start=premium"); }
+function buyPremium() {
+  closePremiumModal();
+  try {
+    tg.openTelegramLink("https://t.me/Dota2PriceBot?start=premium");
+  } catch(e) {
+    // Fallback для случаев когда openTelegramLink недоступен
+    tg.openLink("https://t.me/Dota2PriceBot?start=premium");
+  }
+}
 
 function renderCurrencyList(currencies) {
   var list = document.getElementById("currencyList");
@@ -1006,4 +1021,3 @@ init();
 </script>
 </body>
 </html>
- 

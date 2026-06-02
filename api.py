@@ -449,18 +449,24 @@ def _fetch_item_list(item_names: list, currency: str, symbol: str, limit: int = 
     return result
 
 
-def _fetch_item_list_cached(cache_key: str, item_names: list, currency: str, symbol: str) -> list:
-    """Возвращает список предметов с кешированием на 5 минут."""
+def _fetch_item_list_cached(cache_key: str, item_names: list, currency: str, symbol: str, limit: int = 5) -> list:
+    """Возвращает список предметов с кешированием на 5 минут.
+    Кешируем только если получили limit или больше предметов."""
     key = f"{cache_key}:{currency}"
     cached = _item_cache.get(key)
-    if cached and time.time() - cached["ts"] < CACHE_TTL:
-        # Обновляем символ валюты в кеше
+    # Используем кеш только если в нём достаточно предметов
+    if cached and len(cached["data"]) >= limit and time.time() - cached["ts"] < CACHE_TTL:
         for item in cached["data"]:
             item["symbol"] = symbol
         return cached["data"]
-    fresh = _fetch_item_list(item_names, currency, symbol)
-    if fresh:
+    fresh = _fetch_item_list(item_names, currency, symbol, limit=limit)
+    if len(fresh) >= limit:
+        # Полный результат — кешируем
         _item_cache[key] = {"data": fresh, "ts": time.time()}
+    elif fresh and (not cached or len(fresh) > len(cached.get("data", []))):
+        # Частичный, но лучше чем в кеше — сохраняем без TTL (перепроверим при след. запросе)
+        _item_cache[key] = {"data": fresh, "ts": 0}
+    if fresh:
         return fresh
     # Возвращаем устаревший кеш если Steam не отвечает
     if cached:
