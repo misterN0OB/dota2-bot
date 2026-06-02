@@ -53,22 +53,28 @@ FREE_PORTFOLIO_LIMIT = 5
 _item_cache: dict = {}
 CACHE_TTL = 300  # 5 минут
 
-# Популярные предметы Dota 2
+# Популярные предметы Dota 2 (берём 8 — покажем первые 5 с ценой > 0)
 TOP_ITEMS = [
     "Dragonclaw Hook",
     "Genuine Dragonclaw Hook",
     "Tempest Helm of the Thundergod",
     "Sylvan Cascade",
     "Inscribed Blades of the Reaper",
+    "Demon Eater",
+    "Timebreaker",
+    "Inscribed Fractal Horns of Inner Abysm",
 ]
 
-# Самые дорогие предметы Dota 2
+# Самые дорогие предметы Dota 2 (берём 8 — покажем первые 5 с ценой > 0)
 EXPENSIVE_ITEMS = [
     "Genuine Dragonclaw Hook",
     "Dragonclaw Hook",
     "Tempest Helm of the Thundergod",
     "Genuine Resonant Virtue",
     "Inscribed Corrupted Monarch Bow",
+    "Genuine Swine of the Sunken Galley",
+    "Unusual Fiery Soul of the Slayer",
+    "Inscribed Fractal Horns of Inner Abysm",
 ]
 
 logger = logging.getLogger(__name__)
@@ -203,6 +209,21 @@ def set_currency(body: CurrencyRequest, user: dict = Depends(get_current_user)):
 def search(q: str = Query(..., min_length=2), user: dict = Depends(get_current_user)):
     results = search_items(q, count=8)
     return {"results": results}
+
+
+@app.get("/api/price-preview")
+def price_preview(items: str = Query(...), user: dict = Depends(get_current_user)):
+    """Цены для отображения в списке. Не считается в лимиты проверок."""
+    item_list = [i.strip() for i in items.split(",") if i.strip()][:8]
+    settings = get_user_settings(user["id"])
+    currency = settings.get("currency", "RUB")
+    symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
+    prices = {}
+    for name in item_list:
+        data = get_item_price(name, currency)
+        if data and data["lowest"] > 0:
+            prices[name] = data["lowest"]
+    return {"prices": prices, "symbol": symbol}
 
 
 @app.get("/api/price")
@@ -407,14 +428,16 @@ def ad_reward(body: AdRewardRequest, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Unknown reward_type")
 
 
-def _fetch_item_list(item_names: list, currency: str, symbol: str) -> list:
+def _fetch_item_list(item_names: list, currency: str, symbol: str, limit: int = 5) -> list:
     result = []
     icon_map = {}
     for item_name in item_names:
-        items = search_items(item_name, count=1)
-        if items:
-            icon_map[item_name] = items[0].get("icon", "")
+        sr = search_items(item_name, count=1)
+        if sr:
+            icon_map[item_name] = sr[0].get("icon", "")
     for item_name in item_names:
+        if len(result) >= limit:
+            break
         price_data = get_item_price(item_name, currency)
         if price_data and price_data["lowest"] > 0:
             result.append({

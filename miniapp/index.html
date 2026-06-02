@@ -59,8 +59,11 @@
   .invite-btn:active { opacity: 0.8; }
   .cs2-banner { background: linear-gradient(135deg, #0f1a2e, #1a2a3e); border: 1px solid #1e3a5e; border-radius: var(--radius); padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; margin-bottom: 16px; }
   .cs2-banner:active { opacity: 0.8; }
-  .item-icon-large { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: var(--border); flex-shrink: 0; }
-  .watchlist-item-icon { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; background: var(--border); flex-shrink: 0; margin-bottom: 8px; }
+  .item-icon-large { width: 108px; height: 108px; border-radius: 10px; object-fit: cover; background: var(--border); flex-shrink: 0; }
+  .watchlist-item-icon { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; background: var(--border); flex-shrink: 0; margin-bottom: 8px; }
+  .result-item { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .result-item-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+  .result-price { font-size: 13px; color: var(--gold); font-weight: 600; padding-left: 2px; }
 
   .section-title { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; margin-top: 4px; }
 
@@ -388,6 +391,7 @@ var addModalSelectedItem = null;
 var chartInstance = null;
 var userIsPremium = false;
 var adController = null;
+var savedSearchHtml = "";
 
 function apiUrl(path) {
   var sep = path.indexOf("?") >= 0 ? "&" : "?";
@@ -513,7 +517,12 @@ function goToItemPrice(itemName, icon) {
 }
 
 function goBack() {
-  document.getElementById("searchResults").innerHTML = "";
+  if (savedSearchHtml) {
+    document.getElementById("searchResults").innerHTML = savedSearchHtml;
+  } else {
+    document.getElementById("searchResults").innerHTML = "";
+    document.getElementById("searchInput").value = "";
+  }
 }
 
 function inviteFriend() {
@@ -530,6 +539,7 @@ function inviteFriend() {
 function doSearch() {
   var q = document.getElementById("searchInput").value.trim();
   if (!q) return;
+  savedSearchHtml = "";
   var container = document.getElementById("searchResults");
   container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Поиск...</div></div>';
   apiFetch("/api/search?q=" + encodeURIComponent(q)).then(function(data) {
@@ -538,13 +548,37 @@ function doSearch() {
       container.innerHTML = '<div class="empty-state"><div class="emoji">😕</div><div>Ничего не найдено по «' + q + '»</div><div style="margin-top:10px"><a href="' + steamUrl + '" target="_blank" style="color:var(--gold)">Поискать на Steam Market →</a></div></div>';
       return;
     }
-    container.innerHTML = '<div class="section-title">Результаты поиска</div><div class="results-list">' +
+    var itemNames = data.results.map(function(item) { return item.name || item; });
+    var html = '<div class="section-title">Результаты поиска</div><div class="results-list" id="searchResultsList">' +
       data.results.map(function(item) {
         var name = item.name || item;
         var icon = item.icon || "";
         var imgHtml = icon ? '<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/' + icon + '/62fx62f" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : "";
-        return '<div class="result-item" onclick="showItemPrice(\'' + name.replace(/'/g, "\\'") + '\',\'' + icon.replace(/'/g, "\\'") + '\')">' + imgHtml + '<span class="result-name">' + name + '</span><span class="result-arrow">›</span></div>';
+        return '<div class="result-item" id="ri_' + name.replace(/[^a-zA-Z0-9]/g,'_') + '" onclick="showItemPrice(\'' + name.replace(/'/g, "\\'") + '\',\'' + icon.replace(/'/g, "\\'") + '\')">' +
+          '<div class="result-item-row">' + imgHtml + '<span class="result-name">' + name + '</span><span class="result-arrow" style="margin-left:auto">›</span></div>' +
+          '<div class="result-price" id="price_' + name.replace(/[^a-zA-Z0-9]/g,'_') + '"><span style="color:var(--text-dim);font-size:12px">загрузка цены...</span></div>' +
+          '</div>';
       }).join("") + '</div>';
+    container.innerHTML = html;
+    savedSearchHtml = html;
+    // Грузим цены превью в фоне
+    apiFetch("/api/price-preview?items=" + encodeURIComponent(itemNames.join(","))).then(function(pd) {
+      itemNames.forEach(function(name) {
+        var el = document.getElementById("price_" + name.replace(/[^a-zA-Z0-9]/g,'_'));
+        if (el) {
+          var price = pd.prices[name];
+          el.innerHTML = price ? '<span class="result-price">от ' + fmt(price) + ' ' + pd.symbol + '</span>' : '<span style="color:var(--text-dim);font-size:12px">нет данных о цене</span>';
+        }
+      });
+      savedSearchHtml = container.innerHTML;
+    }).catch(function() {
+      // Цены не загрузились — не критично
+      itemNames.forEach(function(name) {
+        var el = document.getElementById("price_" + name.replace(/[^a-zA-Z0-9]/g,'_'));
+        if (el) el.innerHTML = "";
+      });
+      savedSearchHtml = container.innerHTML;
+    });
   }).catch(function(e) {
     container.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><div>' + e.message + '</div></div>';
   });
@@ -563,7 +597,7 @@ function showItemPrice(itemName, itemIcon) {
       ? '<div class="price-meta" style="margin-top:8px">Осталось проверок: <b>' + checksLeft + '/' + data.checks_limit + '</b> на этой неделе · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">∞ PRO</span></div>'
       : "";
     var iconHtml = itemIcon
-      ? '<img class="item-icon-large" src="https://community.akamai.steamstatic.com/economy/image/' + itemIcon + '/96fx96f" alt="" style="display:block;margin:0 auto 12px" onerror="this.style.display=\'none\'">'
+      ? '<img class="item-icon-large" src="https://community.akamai.steamstatic.com/economy/image/' + itemIcon + '/128fx128f" alt="" style="display:block;margin:0 auto 14px" onerror="this.style.display=\'none\'">'
       : "";
     container.innerHTML = '<div class="price-card">' +
       iconHtml +
@@ -716,7 +750,7 @@ function loadChart(itemName) {
   document.getElementById("chartTitle").textContent = itemName;
   apiFetch("/api/history?item=" + encodeURIComponent(itemName)).then(function(data) {
     if (!data.history.length) {
-      container.innerHTML = '<div class="empty-state"><div class="emoji">📈</div><div>История пока пуста</div></div>';
+      container.innerHTML = '<div class="empty-state"><div class="emoji">📈</div><div style="font-weight:600;margin-bottom:8px">История пуста</div><div style="font-size:12px;color:var(--text-dim);line-height:1.6">График строится автоматически по твоим проверкам цены.<br><br>Найди предмет через <b>Поиск</b>, открой его цену — и точка появится на графике. Чем чаще проверяешь, тем подробнее история.</div></div>';
       return;
     }
     var labels = data.history.map(function(h) {
