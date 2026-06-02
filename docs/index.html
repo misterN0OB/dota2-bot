@@ -652,6 +652,9 @@ async function init() {
     }
   } catch (e) {
     showToast("❌ " + (e.message || "Ошибка подключения"));
+    // Грузим топ скины даже если /api/me упал
+    loadTopItems();
+    loadExpensiveItems();
   }
 }
 
@@ -1092,4 +1095,226 @@ function selectModalItem(itemName) {
     document.getElementById("addModalHint").textContent =
       "Оба порога необязательны. Оставь 0 если не нужно уведомление для этого направления.";
   } else {
-    document.getElementById("addModalWatchlistF
+    document.getElementById("addModalWatchlistFields").style.display = "none";
+    document.getElementById("addModalPortfolioField").style.display = "block";
+    document.getElementById("addModalValue").value = "";
+    document.getElementById("addModalValue").placeholder = "Например: 1200.50";
+    document.getElementById("addModalHint").textContent =
+      "Укажи цену покупки — бот будет считать прибыль/убыток относительно текущей цены.";
+  }
+
+  document.getElementById("addModalForm").style.display = "block";
+  setTimeout(() => {
+    const f = addModalMode === "watchlist"
+      ? document.getElementById("addModalValueLow")
+      : document.getElementById("addModalValue");
+    f.focus();
+  }, 100);
+}
+
+async function submitAdd() {
+  if (!addModalSelectedItem) return;
+
+  try {
+    if (addModalMode === "watchlist") {
+      const tLow = parseFloat(document.getElementById("addModalValueLow").value) || 0;
+      const tHigh = parseFloat(document.getElementById("addModalValueHigh").value) || 0;
+      await apiFetch("/api/watchlist", {
+        method: "POST",
+        body: JSON.stringify({
+          item_name: addModalSelectedItem,
+          threshold: tLow,
+          threshold_high: tHigh > 0 ? tHigh : null,
+        }),
+      });
+      showToast("Добавлено в вотчлист ⭐");
+      closeAddModal();
+      loadWatchlist();
+    } else {
+      const val = parseFloat(document.getElementById("addModalValue").value) || 0;
+      if (val <= 0) { showToast("Введи цену покупки"); return; }
+      await apiFetch("/api/portfolio", {
+        method: "POST",
+        body: JSON.stringify({ item_name: addModalSelectedItem, buy_price: val }),
+      });
+      showToast("Добавлено в портфель 💼");
+      closeAddModal();
+      loadPortfolio();
+    }
+  } catch (e) {
+    if (e.message.includes("лимит") || e.message.includes("Достигнут")) {
+      closeAddModal();
+      openWatchlistLimitModal(e.message);
+    } else if (e.message.includes("Premium") || e.message.includes("Бесплатный")) {
+      closeAddModal();
+      openPremiumModal();
+    } else {
+      showToast(e.message);
+    }
+  }
+}
+
+function addToWatchlistQuick(itemName) {
+  addModalMode = "watchlist";
+  openAddModal();
+  setTimeout(() => selectModalItem(itemName), 50);
+}
+
+function addToPortfolioQuick(itemName, price) {
+  addModalMode = "portfolio";
+  openAddModal();
+  setTimeout(() => {
+    selectModalItem(itemName);
+    setTimeout(() => { document.getElementById("addModalValue").value = price; }, 50);
+  }, 50);
+}
+
+// ── Adsgram ───────────────────────────────────────────────────────────────────
+
+async function initAdsgram() {
+  try {
+    if (typeof window.Adsgram === "undefined") {
+      console.warn("Adsgram not loaded yet, retrying...");
+      setTimeout(initAdsgram, 2000);
+      return;
+    }
+    adController = await window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
+    console.log("Adsgram initialized");
+  } catch(e) {
+    console.warn("Adsgram init failed:", e);
+  }
+}
+
+// ── Adsgram & лимит ───────────────────────────────────────────────────────────
+
+function openLimitModal(msg) {
+  document.getElementById("limitModalText").textContent = msg ||
+    "Лимит проверок цены на этой неделе исчерпан. Посмотри рекламу чтобы получить +3 проверки, или оформи Premium.";
+  document.getElementById("limitModal").classList.add("open");
+}
+
+function closeLimitModal() {
+  document.getElementById("limitModal").classList.remove("open");
+}
+
+function openWatchlistLimitModal(msg) {
+  // Для лимита вотчлиста открываем тот же модал но с другой кнопкой рекламы
+  const btn = document.getElementById("watchAdBtn");
+  btn.textContent = "📺 Смотреть рекламу (+1 слот вотчлиста)";
+  btn.onclick = () => watchAdForReward("watchlist");
+  document.getElementById("limitModalText").textContent = msg ||
+    "Достигнут лимит вотчлиста. Посмотри рекламу (+1 слот) или оформи Premium.";
+  document.getElementById("limitModal").classList.add("open");
+}
+
+async function watchAdForReward(rewardType) {
+  if (!adController) {
+    showToast("Реклама временно недоступна");
+    return;
+  }
+  try {
+    closeLimitModal();
+    showToast("⏳ Загружаю рекламу...");
+    await adController.show();
+    // Реклама просмотрена — начисляем бонус
+    const result = await apiFetch("/api/ad-reward", {
+      method: "POST",
+      body: JSON.stringify({ reward_type: rewardType }),
+    });
+    showToast("✅ " + result.message);
+    // Обновляем данные в памяти
+    if (rewardType === "price_checks" && window._meData) {
+      window._meData.checks_left = result.checks_left;
+      window._meData.checks_limit = result.checks_limit;
+    }
+    if (rewardType === "watchlist" && window._meData) {
+      window._meData.bonus_watchlist = (window._meData.bonus_watchlist || 0) + 1;
+      window._meData.watchlist_limit = result.watchlist_limit;
+      loadWatchlist();
+    }
+  } catch(e) {
+    // Пользователь закрыл рекламу или ошибка
+    if (e && e.done === false) {
+      showToast("Нужно досмотреть рекламу до конца");
+    } else {
+      showToast(e.message || "Ошибка загрузки рекламы");
+    }
+  }
+}
+
+// ── Premium ───────────────────────────────────────────────────────────────────
+
+function openPremiumModal() { document.getElementById("premiumModal").classList.add("open"); }
+function closePremiumModal() { document.getElementById("premiumModal").classList.remove("open"); }
+
+function buyPremium() {
+  closePremiumModal();
+  // Открываем бота для оплаты через Stars
+  tg.openTelegramLink("https://t.me/Dota2PriceBot?start=premium");
+}
+
+// ── Currency ──────────────────────────────────────────────────────────────────
+
+function renderCurrencyList(currencies) {
+  const list = document.getElementById("currencyList");
+  list.innerHTML = currencies.map(c => `
+    <div class="currency-option ${c.code === currentCurrency ? "selected" : ""}"
+      onclick="selectCurrency('${c.code}', '${c.symbol}', this)">
+      <span class="currency-option-name">${c.name}</span>
+      <span>
+        <span class="currency-option-sym">${c.symbol}</span>
+        ${c.code === currentCurrency ? '<span class="currency-check">✓</span>' : ''}
+      </span>
+    </div>`).join("");
+}
+
+async function selectCurrency(code, symbol, el) {
+  try {
+    await apiFetch("/api/settings/currency", {
+      method: "POST",
+      body: JSON.stringify({ currency: code }),
+    });
+    currentCurrency = code;
+    currentSymbol = symbol;
+    document.getElementById("currencyBadge").textContent = code;
+    document.querySelectorAll(".currency-option").forEach(o => {
+      o.classList.remove("selected");
+      var chk = o.querySelector(".currency-check"); if (chk) chk.remove();
+    });
+    el.classList.add("selected");
+    closeCurrencyModal();
+    showToast(`Валюта: ${code}`);
+  } catch (e) { showToast(e.message); }
+}
+
+function openCurrencyModal() { document.getElementById("currencyModal").classList.add("open"); }
+function closeCurrencyModal() { document.getElementById("currencyModal").classList.remove("open"); }
+
+// Закрытие модалок по клику на overlay
+["addModal","currencyModal","premiumModal","limitModal"].forEach(id => {
+  document.getElementById(id).addEventListener("click", function(e) {
+    if (e.target === this) this.classList.remove("open");
+  });
+});
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+
+function fmt(n) {
+  if (n == null) return "—";
+  return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

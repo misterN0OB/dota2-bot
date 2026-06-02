@@ -652,6 +652,9 @@ async function init() {
     }
   } catch (e) {
     showToast("❌ " + (e.message || "Ошибка подключения"));
+    // Грузим топ скины даже если /api/me упал
+    loadTopItems();
+    loadExpensiveItems();
   }
 }
 
@@ -1276,7 +1279,7 @@ async function selectCurrency(code, symbol, el) {
     document.getElementById("currencyBadge").textContent = code;
     document.querySelectorAll(".currency-option").forEach(o => {
       o.classList.remove("selected");
-      o.querySelector(".currency-check")?.remove();
+      var chk = o.querySelector(".currency-check"); if (chk) chk.remove();
     });
     el.classList.add("selected");
     closeCurrencyModal();
