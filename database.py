@@ -84,6 +84,7 @@ def init_db():
             "ALTER TABLE user_settings ADD COLUMN bonus_price_checks INTEGER DEFAULT 0",
             "ALTER TABLE user_activity ADD COLUMN username TEXT",
             "ALTER TABLE user_activity ADD COLUMN first_name TEXT",
+            "ALTER TABLE watchlist ADD COLUMN icon TEXT DEFAULT ''",
         ]:
             try:
                 conn.execute(migration)
@@ -172,7 +173,7 @@ def use_compare(user_id: int):
 # ── watchlist ──────────────────────────────────────────────────────────────────
 
 def add_to_watchlist(user_id: int, item_name: str,
-                     threshold: float = 0.0, threshold_high: float = 0.0) -> bool:
+                     threshold: float = 0.0, threshold_high: float = 0.0, icon: str = "") -> bool:
     """Добавляет предмет в вотчлист. Возвращает False если уже есть."""
     with get_conn() as conn:
         existing = conn.execute(
@@ -183,8 +184,8 @@ def add_to_watchlist(user_id: int, item_name: str,
             return False
         thr_high = threshold_high if threshold_high and threshold_high > 0 else None
         conn.execute(
-            "INSERT INTO watchlist (user_id, item_name, threshold, threshold_high) VALUES (?, ?, ?, ?)",
-            (user_id, item_name, threshold, thr_high)
+            "INSERT INTO watchlist (user_id, item_name, threshold, threshold_high, icon) VALUES (?, ?, ?, ?, ?)",
+            (user_id, item_name, threshold, thr_high, icon)
         )
         return True
 
@@ -468,6 +469,51 @@ def get_watchlist_total() -> int:
     with get_conn() as conn:
         row = conn.execute("SELECT COUNT(*) as cnt FROM watchlist").fetchone()
         return row["cnt"] if row else 0
+
+
+def get_daily_stats(days: int = 30) -> list[dict]:
+    """Статистика по дням: новые пользователи, проверки цен, активные."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT
+                date(created_at) as day,
+                COUNT(CASE WHEN event_type = 'start' THEN 1 END) as new_users,
+                COUNT(CASE WHEN event_type LIKE 'pc_%' THEN 1 END) as price_checks,
+                COUNT(CASE WHEN event_type = 'premium_purchase' THEN 1 END) as premium_sales
+            FROM daily_events
+            WHERE created_at >= datetime('now', ?)
+            GROUP BY date(created_at)
+            ORDER BY day ASC
+        """, (f"-{days} days",)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_daily_active_users(days: int = 30) -> list[dict]:
+    """Активные пользователи по дням."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT
+                date(last_seen) as day,
+                COUNT(*) as active_users
+            FROM user_activity
+            WHERE last_seen >= datetime('now', ?)
+            GROUP BY date(last_seen)
+            ORDER BY day ASC
+        """, (f"-{days} days",)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_top_items_by_checks(limit: int = 10) -> list[dict]:
+    """Самые популярные предметы по количеству проверок."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT item_name, COUNT(*) as checks
+            FROM price_history
+            GROUP BY item_name
+            ORDER BY checks DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        return [dict(r) for r in rows]
 
 
 def get_top_growth_items(limit: int = 5) -> list[dict]:

@@ -187,7 +187,10 @@ async def check_watchlist(context):
     Повторное уведомление — не чаще раза в 24 часа.
     """
     from datetime import datetime, timedelta
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
     from database import get_all_watchlist_items, get_user_settings, update_watchlist_notified
+    MINIAPP_URL = "https://mistern0ob.github.io/dota2-bot/"
+    TRACKER_BTN = InlineKeyboardMarkup([[InlineKeyboardButton("🚀 Открыть трекер цен", web_app=WebAppInfo(url=MINIAPP_URL))]])
 
     items = get_all_watchlist_items()
 
@@ -229,7 +232,7 @@ async def check_watchlist(context):
                     f"🎯 Твой порог снижения: {threshold_low:,.2f} {sym}"
                 )
                 try:
-                    await context.bot.send_message(chat_id=user_id, text=text, parse_mode="HTML")
+                    await context.bot.send_message(chat_id=user_id, text=text, parse_mode="HTML", reply_markup=TRACKER_BTN)
                     update_watchlist_notified(entry["id"], high=False)
                     logger.info("Drop alert sent: user=%s item=%s price=%s", user_id, item_name, lowest)
                 except Exception as e:
@@ -253,7 +256,7 @@ async def check_watchlist(context):
                     f"🎯 Твой порог роста: {threshold_high:,.2f} {sym}"
                 )
                 try:
-                    await context.bot.send_message(chat_id=user_id, text=text, parse_mode="HTML")
+                    await context.bot.send_message(chat_id=user_id, text=text, parse_mode="HTML", reply_markup=TRACKER_BTN)
                     update_watchlist_notified(entry["id"], high=True)
                     logger.info("Rise alert sent: user=%s item=%s price=%s", user_id, item_name, lowest)
                 except Exception as e:

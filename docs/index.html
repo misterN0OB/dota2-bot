@@ -117,6 +117,16 @@
   .sort-chip { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:5px 12px; font-size:12px; color:var(--text-dim); cursor:pointer; white-space:nowrap; flex-shrink:0; }
   .sort-chip.active { border-color:var(--gold); color:var(--gold); }
 
+  /* PREMIUM BANNER */
+  .premium-promo { background:linear-gradient(135deg,#1a1020,#2a1a40); border:1.5px solid #7b5dc4; border-radius:14px; padding:14px 16px; margin-bottom:16px; display:flex; align-items:center; gap:12px; cursor:pointer; position:relative; overflow:hidden; }
+  .premium-promo::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 80% 50%,rgba(123,93,196,.2),transparent 70%); pointer-events:none; }
+  .premium-promo:active { opacity:0.85; }
+  .premium-promo-icon { font-size:32px; flex-shrink:0; }
+  .premium-promo-text { flex:1; }
+  .premium-promo-title { font-size:15px; font-weight:800; color:#c8a8ff; margin-bottom:3px; }
+  .premium-promo-sub { font-size:12px; color:#9878cc; line-height:1.4; }
+  .premium-promo-btn { background:linear-gradient(135deg,#7b5dc4,#5a3fa0); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:13px; font-weight:700; white-space:nowrap; flex-shrink:0; }
+
   /* WATCHLIST */
   .watchlist-item-icon { width:56px; height:56px; border-radius:8px; object-fit:cover; background:var(--border); flex-shrink:0; margin-bottom:8px; }
   .sparkline-wrap { height:40px; margin-top:6px; }
@@ -292,6 +302,14 @@
 
 <!-- SEARCH -->
 <div id="page-search" class="page">
+  <div class="premium-promo prem-hide" onclick="openPremiumModal()">
+    <div class="premium-promo-icon">⭐</div>
+    <div class="premium-promo-text">
+      <div class="premium-promo-title">Dota 2 Tracker Premium</div>
+      <div class="premium-promo-sub">Безлимитный поиск, избранное и портфель · Без рекламы</div>
+    </div>
+    <div class="premium-promo-btn">200 ⭐</div>
+  </div>
   <div class="search-box">
     <input class="search-input" id="searchInput" placeholder="Название предмета..." autocomplete="off" onkeydown="if(event.key==='Enter')doSearch()">
     <button class="search-btn" onclick="doSearch()">&#128269;</button>
@@ -318,6 +336,14 @@
 
 <!-- CHART -->
 <div id="page-chart" class="page">
+  <div class="premium-promo prem-hide" onclick="openPremiumModal()">
+    <div class="premium-promo-icon">⭐</div>
+    <div class="premium-promo-text">
+      <div class="premium-promo-title">Dota 2 Tracker Premium</div>
+      <div class="premium-promo-sub">Безлимитная история цен и уведомления о порогах</div>
+    </div>
+    <div class="premium-promo-btn">200 ⭐</div>
+  </div>
   <div class="graph-search">
     <div class="search-box">
       <input class="search-input" id="chartSearchInput" placeholder="Название предмета..." autocomplete="off" onkeydown="if(event.key==='Enter')doChartSearch()">
@@ -339,6 +365,14 @@
 
 <!-- NOTIF HISTORY -->
 <div id="page-notifhist" class="page">
+  <div class="premium-promo prem-hide" onclick="openPremiumModal()">
+    <div class="premium-promo-icon">⭐</div>
+    <div class="premium-promo-text">
+      <div class="premium-promo-title">Dota 2 Tracker Premium</div>
+      <div class="premium-promo-sub">Безлимитное избранное и мгновенные уведомления</div>
+    </div>
+    <div class="premium-promo-btn">200 ⭐</div>
+  </div>
   <div class="section-title">&#128276; История уведомлений <span class="section-title-action" onclick="clearNotifHistory()">Очистить</span></div>
   <div id="notifHistList"></div>
 </div>
@@ -553,7 +587,10 @@ function init() {
     document.getElementById("currencyBadge").textContent = currentCurrency;
     renderCurrencyList(me.currencies);
     window._meData = me; userIsPremium = me.premium || false;
-    if (userIsPremium) document.getElementById("premiumBadge").classList.add("show");
+    if (userIsPremium) {
+      document.getElementById("premiumBadge").classList.add("show");
+      document.querySelectorAll(".prem-hide").forEach(function(el) { el.style.display = "none"; });
+    }
     if (!userIsPremium && me.checks_left != null && me.checks_left <= 5)
       showToast("Осталось " + me.checks_left + "/" + me.checks_limit + " проверок на этой неделе");
     loadTopItems(); loadExpensiveItems(); loadTopGrowth();

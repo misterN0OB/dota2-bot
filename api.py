@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
-from config import BOT_TOKEN
+from config import BOT_TOKEN, ADMIN_ID
 from database import (
     init_db,
     get_user_settings,
@@ -46,6 +46,16 @@ from database import (
     AD_REWARD_PRICE_CHECKS,
     AD_REWARD_WATCHLIST,
     get_top_growth_items,
+    get_daily_stats,
+    get_daily_active_users,
+    get_top_items_by_checks,
+    get_total_users,
+    get_active_users_count,
+    get_premium_count,
+    get_total_price_checks,
+    get_watchlist_total,
+    get_portfolio_total,
+    get_all_users,
 )
 from skin_checker import get_item_price, search_items, CURRENCIES
 
@@ -248,9 +258,23 @@ def price(item: str = Query(...), user: dict = Depends(get_current_user)):
 
     settings = get_user_settings(user_id)
     currency = settings.get("currency", "RUB")
+    symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
     data = get_item_price(item, currency)
     if not data:
-        raise HTTPException(status_code=404, detail="Item not found or Steam unavailable")
+        # Fallback: последняя известная цена из БД
+        history = get_price_history(item, limit=1)
+        if history:
+            data = {
+                "lowest": history[0]["price"],
+                "median": history[0]["price"],
+                "volume": 0,
+                "symbol": symbol,
+                "currency": currency,
+                "item_name": item,
+                "from_cache": True,
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Предмет не найден или Steam недоступен. Попробуй позже.")
 
     log_user_price_check(user_id)
     if data["lowest"] > 0:
@@ -274,16 +298,20 @@ def get_watchlist_api(user: dict = Depends(get_current_user)):
     symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
     result = []
     for item in items:
-        price_data = get_item_price(item["item_name"], currency)
-        icon = ""
-        sr = search_items(item["item_name"], count=1)
-        if sr:
-            icon = sr[0].get("icon", "")
+        # Пробуем из кэша/Steam, при неудаче берём последнюю цену из БД
+        price_data = get_item_price(item["item_name"], currency, retries=1, retry_delay=0)
+        current_price = None
+        if price_data:
+            current_price = price_data["lowest"]
+        else:
+            history = get_price_history(item["item_name"], limit=1)
+            if history:
+                current_price = history[0]["price"]
         result.append({
             **item,
-            "current_price": price_data["lowest"] if price_data else None,
+            "current_price": current_price,
             "symbol": symbol,
-            "icon": icon,
+            "icon": item.get("icon", ""),
         })
     return {"items": result, "symbol": symbol}
 
@@ -305,7 +333,12 @@ def add_watchlist_api(body: WatchlistAddRequest, user: dict = Depends(get_curren
                 )
             )
     thr_high = body.threshold_high if body.threshold_high and body.threshold_high > 0 else 0.0
-    added = add_to_watchlist(user_id, body.item_name, body.threshold, thr_high)
+    # Получаем иконку при добавлении (один раз)
+    icon = ""
+    sr = search_items(body.item_name, count=1)
+    if sr:
+        icon = sr[0].get("icon", "")
+    added = add_to_watchlist(user_id, body.item_name, body.threshold, thr_high, icon)
     if not added:
         raise HTTPException(status_code=409, detail="Предмет уже есть в вотчлисте")
     return {"ok": True}
@@ -433,17 +466,20 @@ def ad_reward(body: AdRewardRequest, user: dict = Depends(get_current_user)):
 def _fetch_item_list(item_names: list, currency: str, symbol: str, limit: int = 5) -> list:
     result = []
     icon_map = {}
-    for item_name in item_names:
-        sr = search_items(item_name, count=1)
-        if sr:
-            icon_map[item_name] = sr[0].get("icon", "")
+    # Иконки получаем только если Steam не rate-limit (один запрос для всех)
+    try:
+        for item_name in item_names[:limit]:
+            sr = search_items(item_name, count=1)
+            if sr:
+                icon_map[item_name] = sr[0].get("icon", "")
+            time.sleep(0.3)
+    except Exception:
+        pass
     for item_name in item_names:
         if len(result) >= limit:
             break
-        # Пауза 0.4с между запросами — защита от burst rate limit
         if result:
-            time.sleep(0.4)
-        # Для фоновых запросов: 1 попытка без ожидания
+            time.sleep(0.5)
         price_data = get_item_price(item_name, currency, retries=1, retry_delay=0)
         if price_data and price_data["lowest"] > 0:
             result.append({
@@ -452,6 +488,17 @@ def _fetch_item_list(item_names: list, currency: str, symbol: str, limit: int = 
                 "symbol": symbol,
                 "icon": icon_map.get(item_name, ""),
             })
+        else:
+            # Fallback: берём из price_history
+            history = get_price_history(item_name, limit=1)
+            if history and history[0]["price"] > 0:
+                result.append({
+                    "item_name": item_name,
+                    "lowest": history[0]["price"],
+                    "symbol": symbol,
+                    "icon": icon_map.get(item_name, ""),
+                    "from_cache": True,
+                })
     return result
 
 
@@ -584,3 +631,179 @@ def buy_premium_endpoint(user: dict = Depends(get_current_user)):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ── Admin stats ────────────────────────────────────────────────────────────────
+
+def _check_admin_token(token: str = Query(..., alias="token")):
+    expected = hashlib.sha256(BOT_TOKEN.encode()).hexdigest()[:24]
+    if token != expected:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return True
+
+
+@app.get("/api/admin/stats")
+def admin_stats(_: bool = Depends(_check_admin_token)):
+    return {
+        "summary": {
+            "total_users": get_total_users(),
+            "active_24h": get_active_users_count(hours=24),
+            "active_7d": get_active_users_count(hours=168),
+            "premium": get_premium_count(),
+            "checks_today": get_total_price_checks(days=1),
+            "checks_week": get_total_price_checks(days=7),
+            "watchlist_total": get_watchlist_total(),
+            "portfolio_total": get_portfolio_total(),
+        },
+        "daily": get_daily_stats(days=30),
+        "daily_active": get_daily_active_users(days=30),
+        "top_items": get_top_items_by_checks(limit=10),
+        "users": get_all_users(),
+    }
+
+
+@app.get("/admin")
+def admin_page(_: bool = Depends(_check_admin_token)):
+    from fastapi.responses import HTMLResponse
+    token = hashlib.sha256(BOT_TOKEN.encode()).hexdigest()[:24]
+    html = f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dota 2 Bot — Статистика</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root{{--bg:#0d0d14;--surface:#16161f;--card:#1e1e2e;--border:#2a2a3e;--gold:#c89b3c;--green:#3caa6e;--red:#c84040;--text:#e8e8f0;--dim:#888899;}}
+  *{{box-sizing:border-box;margin:0;padding:0;}}
+  body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}}
+  .header{{background:linear-gradient(135deg,#0d0d14,#1a0a0a);border-bottom:1px solid var(--border);padding:20px 24px;display:flex;align-items:center;gap:12px;}}
+  .header h1{{font-size:20px;font-weight:800;color:var(--gold);}}
+  .header .sub{{font-size:13px;color:var(--dim);margin-left:auto;}}
+  .container{{max-width:1200px;margin:0 auto;padding:24px;}}
+  .cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px;}}
+  .card{{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;}}
+  .card-label{{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;}}
+  .card-value{{font-size:28px;font-weight:800;color:var(--gold);}}
+  .card-sub{{font-size:12px;color:var(--dim);margin-top:4px;}}
+  .charts{{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}}
+  @media(max-width:768px){{.charts{{grid-template-columns:1fr;}}}}
+  .chart-box{{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;}}
+  .chart-title{{font-size:13px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:16px;}}
+  .chart-full{{grid-column:1/-1;}}
+  table{{width:100%;border-collapse:collapse;}}
+  th{{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);}}
+  td{{font-size:13px;padding:10px 12px;border-bottom:1px solid #1a1a2a;}}
+  tr:last-child td{{border:none;}}
+  tr:hover td{{background:rgba(255,255,255,.02);}}
+  .badge{{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;}}
+  .badge-gold{{background:rgba(200,155,60,.2);color:var(--gold);}}
+  .badge-green{{background:rgba(60,170,110,.2);color:var(--green);}}
+  .section-title{{font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;margin-top:24px;}}
+  .table-wrap{{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:24px;}}
+  .refresh{{background:var(--gold);color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;}}
+  .loading{{text-align:center;padding:60px;color:var(--dim);font-size:16px;}}
+</style>
+</head>
+<body>
+<div class="header">
+  <span style="font-size:28px">🎮</span>
+  <h1>Dota 2 Price Bot</h1>
+  <div class="sub">
+    <span id="lastUpdate">Загрузка...</span>
+    &nbsp;&nbsp;
+    <button class="refresh" onclick="loadData()">↻ Обновить</button>
+  </div>
+</div>
+<div class="container">
+  <div id="content" class="loading">Загружаем статистику...</div>
+</div>
+<script>
+const TOKEN = "{token}";
+const API = "/api/admin/stats?token=" + TOKEN;
+
+async function loadData() {{
+  try {{
+    const r = await fetch(API);
+    const d = await r.json();
+    render(d);
+    document.getElementById("lastUpdate").textContent = "Обновлено: " + new Date().toLocaleTimeString("ru-RU");
+  }} catch(e) {{
+    document.getElementById("content").innerHTML = "<p style='color:red'>Ошибка загрузки: " + e.message + "</p>";
+  }}
+}}
+
+function render(d) {{
+  const s = d.summary;
+  const days = d.daily.map(x => x.day.slice(5));
+  const newUsers = d.daily.map(x => x.new_users || 0);
+  const checks = d.daily.map(x => x.price_checks || 0);
+  const premium = d.daily.map(x => x.premium_sales || 0);
+  const activeD = d.daily_active.map(x => x.day.slice(5));
+  const activeV = d.daily_active.map(x => x.active_users || 0);
+
+  document.getElementById("content").innerHTML = `
+    <div class="cards">
+      <div class="card"><div class="card-label">Всего пользователей</div><div class="card-value">${{s.total_users}}</div></div>
+      <div class="card"><div class="card-label">Активны за 24ч</div><div class="card-value" style="color:var(--green)">${{s.active_24h}}</div></div>
+      <div class="card"><div class="card-label">Активны за 7 дней</div><div class="card-value">${{s.active_7d}}</div></div>
+      <div class="card"><div class="card-label">Premium</div><div class="card-value" style="color:var(--gold)">${{s.premium}}</div></div>
+      <div class="card"><div class="card-label">Проверок сегодня</div><div class="card-value">${{s.checks_today}}</div></div>
+      <div class="card"><div class="card-label">Проверок за неделю</div><div class="card-value">${{s.checks_week}}</div></div>
+      <div class="card"><div class="card-label">В Избранном</div><div class="card-value">${{s.watchlist_total}}</div><div class="card-sub">предметов</div></div>
+      <div class="card"><div class="card-label">В Портфелях</div><div class="card-value">${{s.portfolio_total}}</div><div class="card-sub">предметов</div></div>
+    </div>
+
+    <div class="charts">
+      <div class="chart-box">
+        <div class="chart-title">📈 Новые пользователи (30 дней)</div>
+        <canvas id="chartUsers"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">🔍 Проверки цен (30 дней)</div>
+        <canvas id="chartChecks"></canvas>
+      </div>
+      <div class="chart-box chart-full">
+        <div class="chart-title">👥 Активные пользователи (30 дней)</div>
+        <canvas id="chartActive"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title">🔥 Топ предметов по проверкам</div>
+    <div class="table-wrap">
+      <table>
+        <tr><th>#</th><th>Предмет</th><th>Проверок</th></tr>
+        ${{d.top_items.map((x,i) => `<tr><td style="color:var(--dim)">${{i+1}}</td><td>${{x.item_name}}</td><td><span class="badge badge-green">${{x.checks}}</span></td></tr>`).join("")}}
+      </table>
+    </div>
+
+    <div class="section-title">👥 Пользователи</div>
+    <div class="table-wrap">
+      <table>
+        <tr><th>Пользователь</th><th>ID</th><th>Последняя активность</th></tr>
+        ${{d.users.map(u => `<tr>
+          <td>${{u.username ? "@"+u.username : u.first_name || "—"}}</td>
+          <td style="color:var(--dim);font-size:12px">${{u.user_id}}</td>
+          <td style="color:var(--dim)">${{(u.last_seen||"").slice(0,16).replace("T"," ")}}</td>
+        </tr>`).join("")}}
+      </table>
+    </div>
+  `;
+
+  const cfg = (labels, data, color, label) => ({{
+    type: "line",
+    data: {{ labels, datasets: [{{ label, data, borderColor: color, backgroundColor: color+"22", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3 }}] }},
+    options: {{ responsive: true, plugins: {{ legend: {{display:false}} }}, scales: {{ x: {{ticks:{{color:"#888899",font:{{size:10}}}},grid:{{color:"#2a2a3e"}}}}, y: {{ticks:{{color:"#888899",font:{{size:10}},stepSize:1}},grid:{{color:"#2a2a3e"}},beginAtZero:true}} }} }}
+  }});
+
+  new Chart(document.getElementById("chartUsers"), cfg(days, newUsers, "#c89b3c", "Новые пользователи"));
+  new Chart(document.getElementById("chartChecks"), cfg(days, checks, "#3caa6e", "Проверки цен"));
+  new Chart(document.getElementById("chartActive"), cfg(activeD, activeV, "#4a9eff", "Активные пользователи"));
+}}
+
+loadData();
+setInterval(loadData, 60000);
+</script>
+</body>
+</html>"""
+    return HTMLResponse(html)
