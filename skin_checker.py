@@ -18,6 +18,9 @@ CURRENCIES = {
     "KZT": {"code": 37, "symbol": "₸",    "name": "Тенге"},
 }
 
+_price_cache: dict = {}  # {(item_name, currency): (price_data, timestamp)}
+CACHE_TTL = 1800  # 30 минут
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -58,12 +61,19 @@ def parse_price_value(price_str: str) -> float:
         return 0.0
 
 
-def get_item_price(item_name: str, currency: str = "RUB", retries: int = 3, retry_delay: float = 2.0) -> dict | None:
+def get_item_price(item_name: str, currency: str = "RUB", retries: int = 3, retry_delay: float = 2.0, use_cache: bool = True) -> dict | None:
     """
     Возвращает словарь с ценами или None если предмет не найден / ошибка API.
     retries=3, retry_delay=2.0 — для пользовательских запросов (ждём и повторяем)
     retries=1, retry_delay=0   — для фоновых запросов (не ждём)
     """
+    cache_key = (item_name, currency)
+    if use_cache and cache_key in _price_cache:
+        cached_data, cached_time = _price_cache[cache_key]
+        if time.time() - cached_time < CACHE_TTL:
+            logger.debug("Cache hit for '%s' (%s)", item_name, currency)
+            return cached_data
+
     cur = CURRENCIES.get(currency, CURRENCIES["RUB"])
     params = {
         "appid": DOTA2_APPID,
@@ -87,7 +97,7 @@ def get_item_price(item_name: str, currency: str = "RUB", retries: int = 3, retr
             lowest = parse_price_value(data.get("lowest_price", ""))
             median = parse_price_value(data.get("median_price", ""))
             volume_raw = data.get("volume", "0").replace(",", "").replace(" ", "")
-            return {
+            result = {
                 "lowest": lowest,
                 "median": median,
                 "volume": int(volume_raw) if volume_raw.isdigit() else 0,
@@ -95,6 +105,8 @@ def get_item_price(item_name: str, currency: str = "RUB", retries: int = 3, retr
                 "currency": currency,
                 "item_name": item_name,
             }
+            _price_cache[cache_key] = (result, time.time())
+            return result
         except Exception as e:
             logger.warning("get_item_price error for '%s' attempt %d: %s", item_name, attempt + 1, e)
     return None

@@ -42,7 +42,9 @@ def init_db():
 
             CREATE TABLE IF NOT EXISTS user_activity (
                 user_id INTEGER PRIMARY KEY,
-                last_seen TEXT
+                last_seen TEXT,
+                username TEXT,
+                first_name TEXT
             );
 
             CREATE TABLE IF NOT EXISTS price_history (
@@ -80,6 +82,8 @@ def init_db():
             "ALTER TABLE watchlist ADD COLUMN last_notified_high TEXT DEFAULT NULL",
             "ALTER TABLE user_settings ADD COLUMN bonus_watchlist INTEGER DEFAULT 0",
             "ALTER TABLE user_settings ADD COLUMN bonus_price_checks INTEGER DEFAULT 0",
+            "ALTER TABLE user_activity ADD COLUMN username TEXT",
+            "ALTER TABLE user_activity ADD COLUMN first_name TEXT",
         ]:
             try:
                 conn.execute(migration)
@@ -309,13 +313,16 @@ def remove_from_portfolio(portfolio_id: int, user_id: int) -> bool:
 
 # ── user_activity ──────────────────────────────────────────────────────────────
 
-def touch_activity(user_id: int):
+def touch_activity(user_id: int, username: str = None, first_name: str = None):
     with get_conn() as conn:
         conn.execute("""
-            INSERT INTO user_activity (user_id, last_seen)
-            VALUES (?, datetime('now'))
-            ON CONFLICT(user_id) DO UPDATE SET last_seen = excluded.last_seen
-        """, (user_id,))
+            INSERT INTO user_activity (user_id, last_seen, username, first_name)
+            VALUES (?, datetime('now'), ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                last_seen = excluded.last_seen,
+                username = COALESCE(excluded.username, username),
+                first_name = COALESCE(excluded.first_name, first_name)
+        """, (user_id, username, first_name))
 
 
 # ── daily_events ───────────────────────────────────────────────────────────────
@@ -461,6 +468,33 @@ def get_watchlist_total() -> int:
     with get_conn() as conn:
         row = conn.execute("SELECT COUNT(*) as cnt FROM watchlist").fetchone()
         return row["cnt"] if row else 0
+
+
+def get_top_growth_items(limit: int = 5) -> list[dict]:
+    """Предметы с наибольшим ростом цены за последние 24 часа."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT
+                item_name,
+                MAX(CASE WHEN recorded_at >= datetime('now', '-24 hours') THEN price END) as latest,
+                MIN(CASE WHEN recorded_at < datetime('now', '-24 hours')
+                          AND recorded_at >= datetime('now', '-48 hours') THEN price END) as prev
+            FROM price_history
+            GROUP BY item_name
+            HAVING latest IS NOT NULL AND prev IS NOT NULL AND prev > 0
+            ORDER BY (latest - prev) / prev DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_all_users() -> list[dict]:
+    """Список всех пользователей с никнеймами."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT user_id, username, first_name, last_seen FROM user_activity ORDER BY last_seen DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def get_portfolio_total() -> int:

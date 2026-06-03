@@ -45,6 +45,7 @@ from database import (
     FREE_WEEKLY_PRICE_CHECKS,
     AD_REWARD_PRICE_CHECKS,
     AD_REWARD_WATCHLIST,
+    get_top_growth_items,
 )
 from skin_checker import get_item_price, search_items, CURRENCIES
 
@@ -175,7 +176,7 @@ def _get_price_checks_info(user_id: int, premium: bool) -> dict:
 @app.get("/api/me")
 def get_me(user: dict = Depends(get_current_user)):
     user_id = user["id"]
-    touch_activity(user_id)
+    touch_activity(user_id, user.get("username"), user.get("first_name"))
     settings = get_user_settings(user_id)
     currency = settings.get("currency", "RUB")
     cur_info = CURRENCIES.get(currency, CURRENCIES["RUB"])
@@ -495,6 +496,26 @@ def get_expensive_items(user: dict = Depends(get_current_user)):
     currency = settings.get("currency", "RUB")
     symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
     return {"items": _fetch_item_list_cached("expensive", EXPENSIVE_ITEMS, currency, symbol)}
+
+
+@app.get("/api/top-growth")
+def get_top_growth(user: dict = Depends(get_current_user)):
+    settings = get_user_settings(user["id"])
+    currency = settings.get("currency", "RUB")
+    symbol = CURRENCIES.get(currency, CURRENCIES["RUB"])["symbol"]
+    rows = get_top_growth_items(limit=5)
+    items = []
+    for r in rows:
+        growth_pct = (r["latest"] - r["prev"]) / r["prev"] * 100
+        items.append({
+            "item_name": r["item_name"],
+            "latest": r["latest"],
+            "prev": r["prev"],
+            "growth_pct": round(growth_pct, 1),
+            "symbol": symbol,
+            "icon": "",
+        })
+    return {"items": items}
 
 
 @app.get("/api/premium")

@@ -44,6 +44,7 @@ from database import (
     get_total_price_checks,
     get_watchlist_total,
     get_portfolio_total,
+    get_all_users,
 )
 from skin_checker import (
     search_items,
@@ -605,6 +606,106 @@ def build_stats_text() -> str:
     )
 
 
+async def cmd_convert(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Конвертер валют. Использование: /convert 100 USD RUB"""
+    args = context.args
+    if len(args) != 3:
+        await update.message.reply_text(
+            "💱 <b>Конвертер валют</b>\n\n"
+            "Использование: <code>/convert 100 USD RUB</code>\n\n"
+            "Доступные валюты: RUB, USD, EUR, UAH, KZT",
+            parse_mode="HTML"
+        )
+        return
+    try:
+        amount = float(args[0].replace(",", "."))
+        from_cur = args[1].upper()
+        to_cur = args[2].upper()
+    except ValueError:
+        await update.message.reply_text("Неверный формат. Пример: <code>/convert 100 USD RUB</code>", parse_mode="HTML")
+        return
+
+    from skin_checker import get_item_price, CURRENCIES
+    if from_cur not in CURRENCIES or to_cur not in CURRENCIES:
+        await update.message.reply_text(
+            f"Неизвестная валюта. Доступные: {', '.join(CURRENCIES.keys())}",
+            parse_mode="HTML"
+        )
+        return
+    if from_cur == to_cur:
+        sym = CURRENCIES[from_cur]["symbol"]
+        await update.message.reply_text(f"💱 {amount:,.2f} {sym} = {amount:,.2f} {sym}", parse_mode="HTML")
+        return
+
+    # Получаем цену одного предмета в обеих валютах для расчёта курса
+    # Используем известный предмет как эталон
+    TEST_ITEM = "Dragonclaw Hook"
+    price_from = get_item_price(TEST_ITEM, from_cur)
+    price_to = get_item_price(TEST_ITEM, to_cur)
+
+    if not price_from or not price_to or not price_from["lowest"] or not price_to["lowest"]:
+        await update.message.reply_text("⚠️ Не удалось получить курс валют. Попробуй позже.")
+        return
+
+    rate = price_to["lowest"] / price_from["lowest"]
+    result = amount * rate
+    sym_from = CURRENCIES[from_cur]["symbol"]
+    sym_to = CURRENCIES[to_cur]["symbol"]
+    await update.message.reply_text(
+        f"💱 <b>Конвертация</b>\n\n"
+        f"{amount:,.2f} {sym_from} = <b>{result:,.2f} {sym_to}</b>\n\n"
+        f"<i>Курс: 1 {sym_from} ≈ {rate:.4f} {sym_to}\n"
+        f"(на основе цен Steam Market)</i>",
+        parse_mode="HTML"
+    )
+
+
+async def backup_database(context):
+    """Ежедневное резервное копирование базы данных."""
+    import shutil
+    from datetime import datetime
+    from database import DB_PATH
+    backup_name = f"{DB_PATH}.backup_{datetime.utcnow().strftime('%Y%m%d')}"
+    try:
+        shutil.copy2(DB_PATH, backup_name)
+        logger.info("Database backed up to %s", backup_name)
+        # Держим только 7 последних бэкапов
+        import glob, os
+        backups = sorted(glob.glob(f"{DB_PATH}.backup_*"))
+        for old in backups[:-7]:
+            os.remove(old)
+    except Exception as e:
+        logger.warning("Backup failed: %s", e)
+
+
+async def cmd_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Список пользователей — только для администратора."""
+    if update.effective_user.id != ADMIN_ID:
+        return
+    users = get_all_users()
+    if not users:
+        await update.message.reply_text("Пользователей пока нет.")
+        return
+    lines = [f"👥 <b>Пользователи ({len(users)})</b>\n"]
+    for u in users:
+        name = f"@{u['username']}" if u['username'] else u['first_name'] or "—"
+        last = (u['last_seen'] or "")[:10]
+        lines.append(f"• {name} <code>{u['user_id']}</code> · {last}")
+    # Telegram ограничивает сообщения — разбиваем если много
+    text = "\n".join(lines)
+    if len(text) > 4000:
+        chunks = [lines[0]]
+        for line in lines[1:]:
+            if len("\n".join(chunks) + "\n" + line) > 4000:
+                await update.message.reply_text("\n".join(chunks), parse_mode="HTML")
+                chunks = []
+            chunks.append(line)
+        if chunks:
+            await update.message.reply_text("\n".join(chunks), parse_mode="HTML")
+    else:
+        await update.message.reply_text(text, parse_mode="HTML")
+
+
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Статистика — только для администратора."""
     if update.effective_user.id != ADMIN_ID:
@@ -710,6 +811,8 @@ def main():
     app.add_handler(CommandHandler("share", share_referral))
     app.add_handler(CommandHandler("premium", cmd_premium))
     app.add_handler(CommandHandler("stats", cmd_stats))   # только для админа
+    app.add_handler(CommandHandler("users", cmd_users))   # только для админа
+    app.add_handler(CommandHandler("convert", cmd_convert))
     app.add_handler(PreCheckoutQueryHandler(pre_checkout))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
 
@@ -721,6 +824,7 @@ def main():
     job_queue.run_repeating(check_watchlist, interval=1800, first=60)
     # Ежедневный дайджест статистики в 9:00 UTC
     job_queue.run_daily(send_daily_digest, time=__import__("datetime").time(11, 0, 0))
+    job_queue.run_daily(backup_database, time=__import__("datetime").time(3, 0, 0))
 
     logger.info("Бот запущен.")
     app.run_polling(drop_pending_updates=True)
