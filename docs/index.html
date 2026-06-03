@@ -830,4 +830,353 @@ function renderWatchlist(data) {
       var iconHtml = item.icon ? '<img class="watchlist-item-icon" src="https://community.akamai.steamstatic.com/economy/image/' + item.icon + '/62fx62f" alt="" onerror="this.style.display=\'none\'">' : "";
       var sparkId = "spark_" + item.id;
       return '<div class="item-card" onclick="goToItemPrice(\'' + item.item_name.replace(/'/g,"\\'") + '\',\'' + (item.icon||"").replace(/'/g,"\\'") + '\')" style="cursor:pointer">' +
-        iconHtml + '<div class="item-card-header"><div class="item-card-name">' + item.item_name + '</div><button class="item-card-delete"
+        iconHtml + '<div class="item-card-header"><div class="item-card-name">' + item.item_name + '</div><button class="item-card-delete" onclick="event.stopPropagation();deleteWatchlistItem(' + item.id + ')">&#215;</button></div>' +
+        '<div class="item-card-row"><span class="item-card-label">Текущая цена</span><span class="item-card-value ' + (below?"threshold-below":above?"profit-positive":"") + '">' + (item.current_price ? fmt(item.current_price) + " " + item.symbol : "—") + '</span></div>' +
+        (item.threshold > 0 ? '<div class="item-card-row"><span class="item-card-label">&#128201; Порог снижения</span><span class="item-card-value">' + fmt(item.threshold) + ' ' + item.symbol + '</span></div>' : '') +
+        (item.threshold_high > 0 ? '<div class="item-card-row"><span class="item-card-label">&#128200; Порог роста</span><span class="item-card-value">' + fmt(item.threshold_high) + ' ' + item.symbol + '</span></div>' : '') +
+        (below ? '<div style="font-size:12px;color:var(--green);margin-top:6px">&#128201; Цена достигла порога снижения!</div>' : '') +
+        (above ? '<div style="font-size:12px;color:var(--green);margin-top:6px">&#128200; Цена достигла порога роста!</div>' : '') +
+        '<div class="sparkline-wrap"><canvas id="' + sparkId + '" height="40"></canvas></div></div>';
+    }).join("");
+  }
+  container.innerHTML = html;
+  items.forEach(function(item) {
+    var sparkId = "spark_" + item.id;
+    drawSparkline(sparkId, item.item_name);
+  });
+}
+
+function sortWatchlist(mode) {
+  watchlistSortMode = mode;
+  renderWatchlist(null);
+}
+
+function drawSparkline(canvasId, itemName) {
+  var hist = lsGet("dota_history_" + itemName, []);
+  if (hist.length < 2) return;
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  if (sparklineInstances[canvasId]) { sparklineInstances[canvasId].destroy(); }
+  sparklineInstances[canvasId] = new Chart(canvas.getContext("2d"), {
+    type: "line",
+    data: { labels: hist.map(function(_,i){return "";}), datasets: [{ data: hist, borderColor: "#c89b3c", borderWidth: 1.5, pointRadius: 0, fill: true, backgroundColor: "rgba(200,155,60,0.08)", tension: 0.4 }] },
+    options: { responsive: false, animation: false, plugins: { legend:{display:false}, tooltip:{enabled:false} }, scales: { x:{display:false}, y:{display:false} } }
+  });
+}
+
+function deleteWatchlistItem(id) {
+  apiFetch("/api/watchlist/" + id, { method: "DELETE" }).then(function() { showToast("Удалено из Избранного"); loadWatchlist(); }).catch(function(e) { showToast(e.message); });
+}
+
+var portfolioData = [];
+function loadPortfolio() {
+  var container = document.getElementById("portfolioContent");
+  container.innerHTML = '<div class="skeleton skeleton-item"></div><div class="skeleton skeleton-item"></div><div class="skeleton skeleton-item"></div>';
+  apiFetch("/api/portfolio").then(function(data) {
+    portfolioData = data;
+    renderPortfolio(data);
+  }).catch(function(e) { container.innerHTML = '<div class="empty-state"><div class="emoji">&#9888;&#65039;</div><div>' + e.message + '</div></div>'; });
+}
+
+function renderPortfolio(data) {
+  var container = document.getElementById("portfolioContent");
+  var items = data.items.slice();
+  var html = "";
+  if (!userIsPremium) {
+    var used = items.length, limit = 5;
+    if (used >= limit) html += '<div class="limit-banner" onclick="openPremiumModal()"><span style="font-size:22px">&#128274;</span><div class="limit-banner-text">Использовано ' + used + '/' + limit + ' мест. Оформи Premium.</div><button class="limit-banner-btn">&#11088; PRO</button></div>';
+    else html += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Использовано ' + used + '/' + limit + ' &middot; <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">Безлимит &#11088;</span></div>';
+  }
+  if (items.length > 1) {
+    html += '<div class="sort-bar">' +
+      '<div class="sort-chip' + (portfolioSortMode==="default"?" active":"") + '" onclick="sortPortfolio(\'default\')">По умолчанию</div>' +
+      '<div class="sort-chip' + (portfolioSortMode==="name"?" active":"") + '" onclick="sortPortfolio(\'name\')">А–Я</div>' +
+      '<div class="sort-chip' + (portfolioSortMode==="profit_desc"?" active":"") + '" onclick="sortPortfolio(\'profit_desc\')">Прибыль ↓</div>' +
+      '<div class="sort-chip' + (portfolioSortMode==="profit_asc"?" active":"") + '" onclick="sortPortfolio(\'profit_asc\')">Прибыль ↑</div>' +
+      '<div class="sort-chip' + (portfolioSortMode==="price_desc"?" active":"") + '" onclick="sortPortfolio(\'price_desc\')">Цена ↓</div>' +
+      '</div>';
+  }
+  if (!items.length) {
+    html += '<div class="empty-state"><div class="emoji">&#128188;</div><div>Портфель пуст</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>';
+  } else {
+    if (portfolioSortMode === "name") items.sort(function(a,b){return a.item_name.localeCompare(b.item_name);});
+    else if (portfolioSortMode === "profit_desc") items.sort(function(a,b){return (b.profit||0)-(a.profit||0);});
+    else if (portfolioSortMode === "profit_asc") items.sort(function(a,b){return (a.profit||0)-(b.profit||0);});
+    else if (portfolioSortMode === "price_desc") items.sort(function(a,b){return (b.current_price||0)-(a.current_price||0);});
+    var tp = data.total_profit, pc = tp >= 0 ? "profit-positive" : "profit-negative", ps = tp >= 0 ? "+" : "";
+    html += '<div class="portfolio-summary">' +
+      '<div class="summary-block"><div class="summary-label">Вложено</div><div class="summary-value">' + fmt(data.total_buy) + ' ' + data.symbol + '</div></div>' +
+      '<div class="summary-block"><div class="summary-label">Сейчас</div><div class="summary-value">' + (data.total_now ? fmt(data.total_now) + ' ' + data.symbol : '—') + '</div></div>' +
+      '<div class="summary-block"><div class="summary-label">Прибыль</div><div class="summary-value ' + pc + '">' + (tp != null ? ps + fmt(tp) : '—') + '</div></div></div>';
+    if (items.some(function(i){return i.profit != null;})) {
+      html += '<div class="portfolio-chart-wrap"><div class="portfolio-chart-title">&#128200; ROI по предметам (%)</div><canvas id="portfolioRoiChart" height="120"></canvas></div>';
+    }
+    html += items.map(function(item) {
+      var pc2 = item.profit >= 0 ? "profit-positive" : "profit-negative", s = item.profit >= 0 ? "+" : "";
+      return '<div class="item-card"><div class="item-card-header"><div class="item-card-name">' + item.item_name + '</div><button class="item-card-delete" onclick="deletePortfolioItem(' + item.id + ')">&#215;</button></div>' +
+        '<div class="item-card-row"><span class="item-card-label">Куплено за</span><span class="item-card-value">' + fmt(item.buy_price) + ' ' + item.symbol + '</span></div>' +
+        '<div class="item-card-row"><span class="item-card-label">Сейчас</span><span class="item-card-value">' + (item.current_price ? fmt(item.current_price) + ' ' + item.symbol : '—') + '</span></div>' +
+        (item.profit != null ? '<div class="item-card-row"><span class="item-card-label">Прибыль</span><span class="item-card-value ' + pc2 + '">' + s + fmt(item.profit) + ' ' + item.symbol + ' (' + s + item.profit_pct.toFixed(1) + '%)</span></div>' : '') + '</div>';
+    }).join("");
+  }
+  container.innerHTML = html;
+  if (items.length && items.some(function(i){return i.profit_pct != null;})) {
+    setTimeout(function() {
+      var cvs = document.getElementById("portfolioRoiChart");
+      if (!cvs) return;
+      if (portfolioChartInstance) portfolioChartInstance.destroy();
+      var filtered = items.filter(function(i){return i.profit_pct!=null;});
+      var labels = filtered.map(function(i){return i.item_name.split(" ").slice(0,2).join(" ");});
+      var vals = filtered.map(function(i){return parseFloat(i.profit_pct.toFixed(1));});
+      var colors = vals.map(function(v){return v>=0?"rgba(60,170,110,0.8)":"rgba(200,64,64,0.8)";});
+      portfolioChartInstance = new Chart(cvs.getContext("2d"), {
+        type: "bar",
+        data: { labels: labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 4 }] },
+        options: { responsive: true, plugins: { legend:{display:false}, tooltip:{ callbacks:{ label:function(ctx){return ctx.parsed.y+"%";} } } },
+          scales: { x:{ticks:{color:"#888899",font:{size:10}},grid:{color:"#2a2a3e"}}, y:{ticks:{color:"#888899",font:{size:10},callback:function(v){return v+"%";}},grid:{color:"#2a2a3e"}} } }
+      });
+    }, 50);
+  }
+}
+
+function sortPortfolio(mode) { portfolioSortMode = mode; renderPortfolio(portfolioData); }
+
+function deletePortfolioItem(id) {
+  apiFetch("/api/portfolio/" + id, { method: "DELETE" }).then(function() { showToast("Удалено из портфеля"); loadPortfolio(); }).catch(function(e) { showToast(e.message); });
+}
+
+function doChartSearch() {
+  var q = document.getElementById("chartSearchInput").value.trim(); if (!q) return;
+  document.getElementById("chartHint").style.display = "none";
+  var container = document.getElementById("chartSearchResults");
+  container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  apiFetch("/api/search?q=" + encodeURIComponent(q)).then(function(data) {
+    if (!data.results.length) { container.innerHTML = '<div class="empty-state"><div>Ничего не найдено</div></div>'; return; }
+    container.innerHTML = '<div class="results-list" style="margin-bottom:12px">' +
+      data.results.map(function(item) {
+        var name = item.name || item;
+        return '<div class="result-item" onclick="loadChart(\'' + name.replace(/'/g,"\\'") + '\')"><div class="result-item-row"><span class="result-name">' + name + '</span><span class="result-arrow">&#8250;</span></div></div>';
+      }).join("") + '</div>';
+  }).catch(function(e) { container.innerHTML = '<div class="empty-state"><div>' + e.message + '</div></div>'; });
+}
+
+function loadChart(itemName) {
+  document.getElementById("chartSearchResults").innerHTML = "";
+  var container = document.getElementById("chartContainer"); container.style.display = "block";
+  document.getElementById("chartTitle").textContent = itemName;
+  apiFetch("/api/history?item=" + encodeURIComponent(itemName)).then(function(data) {
+    if (data.history && data.history.length) {
+      lsSet("dota_history_" + itemName, data.history.map(function(h){return h.price;}));
+    }
+    if (!data.history.length) {
+      container.innerHTML = '<div class="empty-state"><div class="emoji">&#128200;</div><div style="font-weight:600;margin-bottom:8px">История пуста</div><div style="font-size:12px;color:var(--text-dim);line-height:1.6">График строится из твоих проверок цены.<br>Найди предмет через Поиск, открой его цену — и точка появится здесь.</div></div>'; return;
+    }
+    var labels = data.history.map(function(h) { var d = new Date(h.date); return d.getDate() + "." + String(d.getMonth()+1).padStart(2,"0"); });
+    var prices = data.history.map(function(h) { return h.price; });
+    if (chartInstance) chartInstance.destroy();
+    container.innerHTML = '<div class="chart-container"><div class="chart-title" id="chartTitle">' + itemName + '</div><canvas id="priceChart"></canvas></div>';
+    chartInstance = new Chart(document.getElementById("priceChart").getContext("2d"), {
+      type: "line", data: { labels: labels, datasets: [{ label: "Цена", data: prices, borderColor: "#c89b3c", backgroundColor: "rgba(200,155,60,0.1)", borderWidth: 2, pointRadius: 3, pointBackgroundColor: "#c89b3c", fill: true, tension: 0.3 }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: "#888899", font: { size: 11 } }, grid: { color: "#2a2a3e" } }, y: { ticks: { color: "#888899", font: { size: 11 } }, grid: { color: "#2a2a3e" } } } }
+    });
+  }).catch(function(e) { container.innerHTML = '<div class="empty-state"><div>' + e.message + '</div></div>'; });
+}
+
+function openAddModal() {
+  addModalSelectedItem = null;
+  document.getElementById("addModalTitle").textContent = addModalMode === "watchlist" ? "Добавить в Избранное" : "Добавить в портфель";
+  document.getElementById("addModalSearch").value = "";
+  document.getElementById("addModalResults").innerHTML = "";
+  document.getElementById("addModalSearchBox").style.display = "block";
+  document.getElementById("addModalForm").style.display = "none";
+  document.getElementById("addModalSearchButtons").style.display = "flex";
+  document.getElementById("addModal").classList.add("open");
+  setTimeout(function() { document.getElementById("addModalSearch").focus(); }, 100);
+}
+function closeAddModal() { document.getElementById("addModal").classList.remove("open"); }
+
+function doModalSearch() {
+  var q = document.getElementById("addModalSearch").value.trim(); if (!q) return;
+  var container = document.getElementById("addModalResults");
+  container.innerHTML = '<div class="loading" style="padding:10px"><div class="spinner" style="width:16px;height:16px;margin:0 auto 4px"></div></div>';
+  apiFetch("/api/search?q=" + encodeURIComponent(q)).then(function(data) {
+    if (!data.results.length) { container.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:8px 0">Ничего не найдено</div>'; return; }
+    container.innerHTML = '<div class="results-list" style="margin-top:8px;max-height:200px;overflow-y:auto">' +
+      data.results.map(function(item) {
+        var name = item.name || item, icon = item.icon || "";
+        var imgHtml = icon ? '<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/' + icon + '/62fx62f" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : "";
+        return '<div class="result-item" onclick="selectModalItem(\'' + name.replace(/'/g,"\\'") + '\')">' + imgHtml + '<span class="result-name" style="font-size:13px">' + name + '</span></div>';
+      }).join("") + '</div>';
+  }).catch(function(e) { container.innerHTML = '<div style="color:var(--red);font-size:13px">' + e.message + '</div>'; });
+}
+
+function selectModalItem(itemName) {
+  addModalSelectedItem = itemName;
+  document.getElementById("addModalSearchBox").style.display = "none";
+  document.getElementById("addModalSearchButtons").style.display = "none";
+  document.getElementById("addModalItemName").textContent = itemName;
+  if (addModalMode === "watchlist") {
+    document.getElementById("addModalWatchlistFields").style.display = "block";
+    document.getElementById("addModalPortfolioField").style.display = "none";
+    document.getElementById("addModalValueLow").value = "";
+    document.getElementById("addModalValueHigh").value = "";
+    document.getElementById("addModalHint").textContent = "Оба порога необязательны. Оставь 0 если не нужно.";
+  } else {
+    document.getElementById("addModalWatchlistFields").style.display = "none";
+    document.getElementById("addModalPortfolioField").style.display = "block";
+    document.getElementById("addModalValue").value = "";
+    document.getElementById("addModalValue").placeholder = "Например: 1200.50";
+    document.getElementById("addModalHint").textContent = "Укажи цену покупки для расчёта прибыли/убытка.";
+  }
+  document.getElementById("addModalForm").style.display = "block";
+  setTimeout(function() { (addModalMode === "watchlist" ? document.getElementById("addModalValueLow") : document.getElementById("addModalValue")).focus(); }, 100);
+}
+
+function submitAdd() {
+  if (!addModalSelectedItem) return;
+  if (addModalMode === "watchlist") {
+    var tLow = parseFloat(document.getElementById("addModalValueLow").value) || 0;
+    var tHigh = parseFloat(document.getElementById("addModalValueHigh").value) || 0;
+    apiFetch("/api/watchlist", { method: "POST", body: JSON.stringify({ item_name: addModalSelectedItem, threshold: tLow, threshold_high: tHigh > 0 ? tHigh : null }) }).then(function() {
+      showToast("Добавлено в Избранное"); closeAddModal(); loadWatchlist();
+    }).catch(function(e) {
+      if (e.message.indexOf("лимит") >= 0 || e.message.indexOf("Достигнут") >= 0) { closeAddModal(); openWatchlistLimitModal(e.message); }
+      else if (e.message.indexOf("Premium") >= 0 || e.message.indexOf("уже есть") >= 0) { closeAddModal(); openPremiumModal(); }
+      else showToast(e.message);
+    });
+  } else {
+    var val = parseFloat(document.getElementById("addModalValue").value) || 0;
+    if (val <= 0) { showToast("Введи цену покупки"); return; }
+    apiFetch("/api/portfolio", { method: "POST", body: JSON.stringify({ item_name: addModalSelectedItem, buy_price: val }) }).then(function() {
+      showToast("Добавлено в портфель"); closeAddModal(); loadPortfolio();
+    }).catch(function(e) {
+      if (e.message.indexOf("Premium") >= 0 || e.message.indexOf("Бесплатный") >= 0) { closeAddModal(); openPremiumModal(); }
+      else showToast(e.message);
+    });
+  }
+}
+
+function addToWatchlistQuick(itemName) { addModalMode = "watchlist"; openAddModal(); setTimeout(function() { selectModalItem(itemName); }, 50); }
+function addToPortfolioQuick(itemName, price) {
+  addModalMode = "portfolio"; openAddModal();
+  setTimeout(function() { selectModalItem(itemName); setTimeout(function() { document.getElementById("addModalValue").value = price; }, 50); }, 50);
+}
+
+function initAdsgram() {
+  try {
+    if (typeof window.Adsgram === "undefined") { setTimeout(initAdsgram, 2000); return; }
+    window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID }).then(function(ctrl) { adController = ctrl; }).catch(function(){});
+  } catch(e) {}
+}
+
+function openLimitModal(msg) {
+  document.getElementById("limitModalText").textContent = msg || "Лимит проверок исчерпан. Посмотри рекламу или оформи Premium.";
+  var btn = document.getElementById("watchAdBtn");
+  btn.textContent = "Смотреть рекламу (+3 проверки)";
+  btn.onclick = function() { watchAdForReward("price_checks"); };
+  document.getElementById("limitModal").classList.add("open");
+}
+function closeLimitModal() { document.getElementById("limitModal").classList.remove("open"); }
+
+function openWatchlistLimitModal(msg) {
+  var btn = document.getElementById("watchAdBtn");
+  btn.textContent = "Смотреть рекламу (+1 слот Избранного)";
+  btn.onclick = function() { watchAdForReward("watchlist"); };
+  document.getElementById("limitModalText").textContent = msg || "Достигнут лимит Избранного. Посмотри рекламу (+1 слот) или оформи Premium.";
+  document.getElementById("limitModal").classList.add("open");
+}
+
+function watchAdForReward(rewardType) {
+  if (!adController) { showToast("Реклама временно недоступна"); return; }
+  closeLimitModal(); showToast("Загружаю рекламу...");
+  adController.show().then(function() {
+    return apiFetch("/api/ad-reward", { method: "POST", body: JSON.stringify({ reward_type: rewardType }) });
+  }).then(function(result) {
+    showToast(result.message || "Бонус начислен!");
+    if (rewardType === "price_checks" && window._meData) { window._meData.checks_left = result.checks_left; window._meData.checks_limit = result.checks_limit; }
+    if (rewardType === "watchlist" && window._meData) { window._meData.bonus_watchlist = (window._meData.bonus_watchlist || 0) + 1; loadWatchlist(); }
+  }).catch(function(e) {
+    if (e && e.done === false) showToast("Нужно досмотреть рекламу до конца");
+    else showToast(e.message || "Ошибка загрузки рекламы");
+  });
+}
+
+function openPremiumModal() { if (userIsPremium) { showToast("У тебя уже есть Premium!"); return; } document.getElementById("premiumModal").classList.add("open"); }
+function closePremiumModal() { document.getElementById("premiumModal").classList.remove("open"); }
+function buyPremium() {
+  closePremiumModal(); showToast("Создаю инвойс...");
+  apiFetch("/api/buy-premium", { method: "POST" }).then(function(result) {
+    if (result.already_premium) showToast("У тебя уже есть Premium!");
+    else { showToast("Инвойс отправлен в чат!"); setTimeout(function() { tg.close(); }, 1500); }
+  }).catch(function(e) { showToast("Ошибка: " + (e.message || "попробуй снова")); });
+}
+
+function renderCurrencyList(currencies) {
+  var list = document.getElementById("currencyList");
+  list.innerHTML = currencies.map(function(c) {
+    return '<div class="currency-option ' + (c.code === currentCurrency ? "selected" : "") + '" onclick="selectCurrency(\'' + c.code + '\',\'' + c.symbol + '\',this)">' +
+      '<span class="currency-option-name">' + c.name + '</span>' +
+      '<span><span class="currency-option-sym">' + c.symbol + '</span>' + (c.code === currentCurrency ? '<span class="currency-check">&#10003;</span>' : '') + '</span></div>';
+  }).join("");
+}
+
+function selectCurrency(code, symbol, el) {
+  apiFetch("/api/settings/currency", { method: "POST", body: JSON.stringify({ currency: code }) }).then(function() {
+    currentCurrency = code; currentSymbol = symbol;
+    document.getElementById("currencyBadge").textContent = code;
+    document.querySelectorAll(".currency-option").forEach(function(o) {
+      o.classList.remove("selected");
+      var chk = o.querySelector(".currency-check"); if (chk) chk.parentNode.removeChild(chk);
+    });
+    el.classList.add("selected"); closeCurrencyModal(); showToast("Валюта: " + code);
+  }).catch(function(e) { showToast(e.message); });
+}
+
+function openCurrencyModal() { document.getElementById("currencyModal").classList.add("open"); }
+function closeCurrencyModal() { document.getElementById("currencyModal").classList.remove("open"); }
+
+function inviteFriend() {
+  var userId = window._meData && window._meData.user && window._meData.user.id;
+  if (!userId) { showToast("Открой приложение через Telegram"); return; }
+  try { tg.openTelegramLink("https://t.me/share/url?url=" + encodeURIComponent("https://t.me/Dota2PriceBot?start=ref_" + userId) + "&text=" + encodeURIComponent("Dota 2 Price Tracker — цены скинов в Telegram!")); }
+  catch(e) { showToast("Ссылка: t.me/Dota2PriceBot?start=ref_" + userId); }
+}
+
+function setupPullToRefresh(pageId, ptrId, refreshFn) {
+  var page = document.getElementById(pageId);
+  var ptr = document.getElementById(ptrId);
+  var startY = 0, pulling = false;
+  page.addEventListener("touchstart", function(e) { if (page.scrollTop === 0) { startY = e.touches[0].clientY; pulling = true; } }, {passive:true});
+  page.addEventListener("touchmove", function(e) {
+    if (!pulling) return;
+    var dy = e.touches[0].clientY - startY;
+    if (dy > 50) { ptr.classList.add("visible"); }
+  }, {passive:true});
+  page.addEventListener("touchend", function() {
+    if (ptr.classList.contains("visible")) { ptr.classList.remove("visible"); refreshFn(); }
+    pulling = false;
+  });
+}
+setupPullToRefresh("page-home", "ptrHome", function() { loadTopItems(); loadExpensiveItems(); showToast("Обновляем..."); });
+setupPullToRefresh("page-watchlist", "ptrWatchlist", loadWatchlist);
+setupPullToRefresh("page-portfolio", "ptrPortfolio", loadPortfolio);
+
+["addModal","currencyModal","premiumModal","limitModal","compareModal"].forEach(function(id) {
+  document.getElementById(id).addEventListener("click", function(e) { if (e.target === this) this.classList.remove("open"); });
+});
+
+function fmt(n) {
+  if (n == null) return "—";
+  return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+var toastTimer;
+function showToast(msg) {
+  var t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(function() { t.classList.remove("show"); }, 2500);
+}
+
+init();
+</script>
+</body>
+</html>
