@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dota 2 Price Tracker</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script async src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<style>
+  :root {
+    --bg:#0d0d14; --surface:#16161f; --card:#1e1e2e; --border:#2a2a3e;
+    --accent:#c8292d; --gold:#c89b3c; --gold-dim:#8a6b28;
+    --text:#e8e8f0; --text-dim:#888899; --green:#3caa6e; --red:#c84040; --radius:10px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:70px; overflow-x:hidden; }
+
+  /* HEADER */
+  .header { background:linear-gradient(135deg,#0d0d14,#1a0a0a); border-bottom:1px solid var(--border); padding:14px 16px 10px; display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:100; }
+  .header-title { font-size:17px; font-weight:700; color:var(--gold); }
+  .header-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+  .premium-badge { background:linear-gradient(135deg,#c89b3c,#8a6b28); border-radius:6px; padding:3px 8px; font-size:11px; font-weight:700; color:#000; display:none; }
+  .premium-badge.show { display:block; }
+  .currency-badge { background:var(--card); border:1px solid var(--border); border-radius:6px; padding:4px 10px; font-size:13px; color:var(--text-dim); cursor:pointer; }
+
+  /* NAV */
+  .nav { position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border); display:flex; z-index:100; }
+  .nav-btn { flex:1; padding:10px 2px 8px; display:flex; flex-direction:column; align-items:center; gap:3px; background:none; border:none; color:var(--text-dim); font-size:9px; cursor:pointer; }
+  .nav-btn .icon { font-size:18px; }
+  .nav-btn.active { color:var(--gold); }
+  .nav-btn:active { opacity:0.7; }
+
+  /* PAGES */
+  .page { display:none; padding:16px; animation:fadeIn .2s ease; }
+  .page.active { display:block; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+  /* PULL TO REFRESH */
+  .ptr-indicator { text-align:center; padding:10px; color:var(--text-dim); font-size:13px; height:0; overflow:hidden; transition:height .2s; }
+  .ptr-indicator.visible { height:40px; }
+
+  /* HOME */
+  .home-banner { background:linear-gradient(135deg,#1a0505,#0d0d14 60%,#0a0a1a); border:1px solid #3a1a1a; border-radius:14px; padding:20px 16px; margin-bottom:16px; text-align:center; position:relative; overflow:hidden; }
+  .home-banner::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 50% 0%,rgba(200,41,45,.15),transparent 70%); }
+  .home-banner-title { font-size:22px; font-weight:800; background:linear-gradient(135deg,#c89b3c,#e8c870); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:6px; }
+  .home-banner-sub { font-size:13px; color:var(--text-dim); }
+  .home-search-box { display:flex; gap:8px; margin-bottom:16px; }
+  .home-sections { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+  .home-section-btn { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 12px; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; text-align:center; transition:border-color .15s; }
+  .home-section-btn:active { border-color:var(--gold-dim); }
+  .home-section-btn .sec-icon { font-size:26px; }
+  .home-section-btn .sec-name { font-size:13px; font-weight:600; }
+  .home-section-btn .sec-desc { font-size:11px; color:var(--text-dim); }
+  .invite-btn { width:100%; padding:12px 16px; margin-bottom:16px; background:linear-gradient(135deg,#1a2e1a,#0f1a0f); border:1px solid #2a5a2a; border-radius:var(--radius); color:#4caf50; font-size:14px; font-weight:600; cursor:pointer; text-align:center; }
+  .invite-btn:active { opacity:0.8; }
+  .cs2-banner { background:linear-gradient(135deg,#0f1a2e,#1a2a3e); border:1px solid #1e3a5e; border-radius:var(--radius); padding:12px 14px; display:flex; align-items:center; gap:12px; cursor:pointer; margin-bottom:16px; }
+  .cs2-banner:active { opacity:0.8; }
+
+  /* RECENTLY VIEWED */
+  .recent-scroll { display:flex; gap:10px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .recent-scroll::-webkit-scrollbar { display:none; }
+  .recent-chip { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:6px 12px; white-space:nowrap; cursor:pointer; font-size:12px; display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .recent-chip:active { border-color:var(--gold-dim); }
+  .recent-chip img { width:20px; height:20px; border-radius:4px; object-fit:cover; }
+
+  /* SECTION TITLE */
+  .section-title { font-size:12px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.8px; margin-bottom:10px; margin-top:4px; display:flex; align-items:center; justify-content:space-between; }
+  .section-title-action { font-size:11px; color:var(--gold); cursor:pointer; text-transform:none; letter-spacing:0; }
+
+  /* TOP ITEMS */
+  .top-item { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:10px 14px; margin-bottom:8px; display:flex; align-items:center; gap:10px; justify-content:space-between; cursor:pointer; transition:border-color .15s; }
+  .top-item:active { border-color:var(--gold-dim); }
+  .top-item-img { width:40px; height:40px; border-radius:6px; object-fit:cover; background:var(--border); flex-shrink:0; }
+  .top-item-name { font-size:13px; font-weight:500; flex:1; margin-right:8px; }
+  .top-item-price { font-size:14px; font-weight:700; color:var(--gold); white-space:nowrap; }
+
+  /* SEARCH */
+  .result-img { width:40px; height:40px; border-radius:6px; object-fit:cover; background:var(--border); flex-shrink:0; }
+  .search-box { display:flex; gap:8px; margin-bottom:16px; }
+  .search-input { flex:1; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; color:var(--text); font-size:15px; outline:none; }
+  .search-input:focus { border-color:var(--gold-dim); }
+  .search-input::placeholder { color:var(--text-dim); }
+  .search-btn { background:var(--accent); border:none; border-radius:var(--radius); padding:12px 18px; color:#fff; font-size:15px; cursor:pointer; font-weight:600; }
+  .search-btn:active { opacity:0.8; }
+  .results-list { display:flex; flex-direction:column; gap:8px; }
+  .result-item { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; cursor:pointer; display:flex; flex-direction:column; gap:4px; transition:border-color .15s; }
+  .result-item:active { border-color:var(--gold-dim); }
+  .result-item-row { display:flex; align-items:center; gap:10px; }
+  .result-name { font-size:14px; font-weight:500; flex:1; }
+  .result-arrow { color:var(--text-dim); font-size:12px; margin-left:auto; }
+  .result-price { font-size:12px; color:var(--gold); font-weight:600; }
+  .result-compare-check { width:18px; height:18px; border-radius:4px; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; cursor:pointer; }
+  .result-compare-check.checked { background:var(--gold); border-color:var(--gold); color:#000; }
+  .compare-bar { position:fixed; bottom:70px; left:0; right:0; background:var(--surface); border-top:1px solid var(--gold-dim); padding:10px 16px; display:none; align-items:center; justify-content:space-between; z-index:95; }
+  .compare-bar.visible { display:flex; }
+
+  /* PRICE CARD */
+  .price-card { background:linear-gradient(135deg,var(--card),#1a0f0f); border:1px solid var(--border); border-radius:var(--radius); padding:18px; margin-bottom:12px; }
+  .price-card-name { font-size:15px; font-weight:600; color:var(--gold); margin-bottom:14px; line-height:1.4; }
+  .price-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .price-label { font-size:13px; color:var(--text-dim); }
+  .price-value { font-size:18px; font-weight:700; color:var(--text); }
+  .price-value.main { font-size:24px; color:var(--gold); }
+  .price-meta { font-size:12px; color:var(--text-dim); margin-top:6px; }
+  .price-actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .item-icon-large { width:108px; height:108px; border-radius:10px; object-fit:cover; background:var(--border); display:block; margin:0 auto 14px; }
+
+  /* DELTA BADGE */
+  .delta-badge { font-size:11px; font-weight:700; padding:2px 6px; border-radius:10px; margin-left:6px; }
+  .delta-up { background:rgba(60,170,110,.2); color:var(--green); }
+  .delta-down { background:rgba(200,64,64,.2); color:var(--red); }
+
+  /* SORT BAR */
+  .sort-bar { display:flex; gap:8px; margin-bottom:12px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:2px; }
+  .sort-bar::-webkit-scrollbar { display:none; }
+  .sort-chip { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:5px 12px; font-size:12px; color:var(--text-dim); cursor:pointer; white-space:nowrap; flex-shrink:0; }
+  .sort-chip.active { border-color:var(--gold); color:var(--gold); }
+
+  /* WATCHLIST */
+  .watchlist-item-icon { width:56px; height:56px; border-radius:8px; object-fit:cover; background:var(--border); flex-shrink:0; margin-bottom:8px; }
+  .sparkline-wrap { height:40px; margin-top:6px; }
+
+  /* BUTTONS */
+  .btn { flex:1; padding:10px; border:none; border-radius:var(--radius); font-size:13px; font-weight:600; cursor:pointer; }
+  .btn:active { opacity:0.8; }
+  .btn-primary { background:var(--accent); color:#fff; }
+  .btn-secondary { background:var(--card); border:1px solid var(--border); color:var(--text); }
+  .btn-gold { background:var(--gold); color:#000; }
+  .btn-stars { background:linear-gradient(135deg,#5a3fa0,#7b5dc4); color:#fff; }
+  .btn-green { background:linear-gradient(135deg,#2d6a4f,#40916c); color:#fff; }
+  .btn-blue { background:linear-gradient(135deg,#1a3a6e,#2a5aae); color:#fff; }
+
+  /* STATES */
+  .empty-state { text-align:center; padding:40px 20px; color:var(--text-dim); font-size:14px; }
+  .empty-state .emoji { font-size:40px; margin-bottom:12px; }
+  .loading { text-align:center; padding:30px; color:var(--text-dim); }
+  .spinner { display:inline-block; width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--gold); border-radius:50%; animation:spin .7s linear infinite; margin-bottom:8px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* SKELETON */
+  .skeleton { background:linear-gradient(90deg,var(--card) 25%,var(--border) 50%,var(--card) 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; border-radius:6px; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .skeleton-item { height:64px; border-radius:var(--radius); margin-bottom:8px; }
+  .skeleton-text { height:14px; width:60%; margin-bottom:8px; }
+  .skeleton-text.short { width:35%; }
+
+  /* ITEM CARDS */
+  .item-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:10px; transition:border-color .15s; }
+  .item-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .item-card-name { font-size:14px; font-weight:600; flex:1; margin-right:8px; line-height:1.3; }
+  .item-card-delete { background:none; border:none; color:var(--text-dim); font-size:18px; cursor:pointer; padding:0 4px; }
+  .item-card-delete:active { color:var(--red); }
+  .item-card-row { display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px; }
+  .item-card-label { color:var(--text-dim); }
+  .item-card-value { font-weight:600; }
+  .profit-positive { color:var(--green); }
+  .profit-negative { color:var(--red); }
+  .threshold-below { color:var(--green); }
+
+  /* LIMIT BANNER */
+  .limit-banner { background:linear-gradient(135deg,#1a0f00,#1e1a00); border:1px solid #3a2a00; border-radius:var(--radius); padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; cursor:pointer; }
+  .limit-banner-text { flex:1; font-size:12px; color:#c8a040; line-height:1.4; }
+  .limit-banner-btn { background:var(--gold); color:#000; border:none; border-radius:6px; padding:5px 10px; font-size:12px; font-weight:700; cursor:pointer; }
+
+  /* PORTFOLIO */
+  .portfolio-summary { background:linear-gradient(135deg,#1a0f0f,var(--card)); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:16px; display:flex; gap:16px; }
+  .summary-block { flex:1; text-align:center; }
+  .summary-label { font-size:11px; color:var(--text-dim); margin-bottom:4px; }
+  .summary-value { font-size:17px; font-weight:700; }
+  .portfolio-chart-wrap { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:16px; }
+  .portfolio-chart-title { font-size:12px; color:var(--text-dim); margin-bottom:10px; }
+
+  /* FAB */
+  .fab { position:fixed; bottom:78px; right:16px; width:52px; height:52px; background:var(--accent); border:none; border-radius:50%; color:#fff; font-size:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 16px rgba(200,41,45,.4); z-index:90; transition:transform .15s; }
+  .fab:active { transform:scale(.93); }
+  .fab.hidden { display:none; }
+
+  /* MODALS */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:200; align-items:flex-end; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:16px 16px 0 0; padding:20px 16px 32px; width:100%; animation:slide-up .2s ease; max-height:90vh; overflow-y:auto; }
+  @keyframes slide-up { from { transform:translateY(100%); } to { transform:translateY(0); } }
+  .modal-title { font-size:17px; font-weight:700; margin-bottom:16px; color:var(--gold); }
+  .modal-input { width:100%; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; color:var(--text); font-size:15px; outline:none; margin-bottom:8px; }
+  .modal-input:focus { border-color:var(--gold-dim); }
+  .modal-hint { font-size:12px; color:var(--text-dim); margin-bottom:12px; line-height:1.5; }
+  .modal-buttons { display:flex; gap:8px; margin-top:4px; }
+  .premium-modal { text-align:center; }
+  .premium-modal .stars-icon { font-size:52px; margin-bottom:10px; }
+  .premium-modal .premium-title { font-size:20px; font-weight:800; color:var(--gold); margin-bottom:8px; }
+  .premium-modal .premium-features { text-align:left; margin:16px 0; }
+  .premium-feature { display:flex; align-items:center; gap:10px; padding:8px 0; font-size:14px; border-bottom:1px solid var(--border); }
+  .premium-feature:last-child { border:none; }
+  .premium-feature .feat-icon { font-size:20px; width:28px; text-align:center; }
+
+  /* COMPARE */
+  .compare-grid { display:flex; gap:10px; margin-bottom:12px; }
+  .compare-col { flex:1; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px; text-align:center; min-width:0; }
+  .compare-col-name { font-size:12px; font-weight:600; color:var(--gold); margin-bottom:8px; line-height:1.3; word-break:break-word; }
+  .compare-row { display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+  .compare-row:last-child { border:none; margin-bottom:0; padding-bottom:0; }
+  .compare-col img { width:60px; height:60px; border-radius:8px; object-fit:cover; background:var(--border); margin-bottom:8px; }
+
+  /* CHART */
+  .graph-search { margin-bottom:16px; }
+  .chart-container { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+  .chart-title { font-size:13px; color:var(--text-dim); margin-bottom:12px; }
+
+  /* CURRENCY */
+  .currency-list { display:flex; flex-direction:column; gap:8px; }
+  .currency-option { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 16px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; }
+  .currency-option.selected { border-color:var(--gold); }
+  .currency-option:active { opacity:0.8; }
+  .currency-option-name { font-size:15px; font-weight:500; }
+  .currency-option-sym { font-size:14px; color:var(--text-dim); }
+  .currency-check { color:var(--gold); font-size:16px; }
+
+  /* NOTIF HISTORY */
+  .notif-item { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-bottom:8px; display:flex; gap:10px; align-items:flex-start; }
+  .notif-icon { font-size:20px; flex-shrink:0; }
+  .notif-body { flex:1; }
+  .notif-name { font-size:13px; font-weight:600; margin-bottom:2px; }
+  .notif-desc { font-size:12px; color:var(--text-dim); }
+  .notif-time { font-size:11px; color:var(--text-dim); margin-top:2px; }
+
+  /* TOAST */
+  .toast { position:fixed; bottom:82px; left:50%; transform:translateX(-50%); background:var(--card); border:1px solid var(--border); border-radius:20px; padding:8px 18px; font-size:13px; color:var(--text); z-index:300; opacity:0; transition:opacity .2s; white-space:nowrap; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div class="header">
+  <img src="logo.png" alt="" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">
+  <span class="header-title">Dota 2 Prices</span>
+  <div class="header-right">
+    <span class="premium-badge" id="premiumBadge">&#11088; PRO</span>
+    <div class="currency-badge" onclick="openCurrencyModal()" id="currencyBadge">RUB</div>
+  </div>
+</div>
+
+<!-- HOME -->
+<div id="page-home" class="page active">
+  <div class="ptr-indicator" id="ptrHome">&#8635; Отпустите для обновления</div>
+  <div class="home-banner">
+    <img src="logo.png" alt="" style="width:72px;height:72px;border-radius:14px;object-fit:cover;margin-bottom:10px;box-shadow:0 4px 16px rgba(200,41,45,.4);position:relative;z-index:1" onerror="this.style.display='none'">
+    <div class="home-banner-title">Dota 2 Price Tracker</div>
+    <div class="home-banner-sub">Цены Steam Market в реальном времени</div>
+  </div>
+  <div class="home-search-box">
+    <input class="search-input" id="homeSearchInput" placeholder="Быстрый поиск предмета..." autocomplete="off" onkeydown="if(event.key==='Enter')doHomeSearch()">
+    <button class="search-btn" onclick="doHomeSearch()">&#128269;</button>
+  </div>
+  <div id="recentSection" style="margin-bottom:16px;display:none">
+    <div class="section-title">&#128336; Недавно просмотренные <span class="section-title-action" onclick="clearRecent()">Очистить</span></div>
+    <div class="recent-scroll" id="recentList"></div>
+  </div>
+  <button class="invite-btn" onclick="inviteFriend()">&#127873; Пригласить друга — получи +3 слота в Избранное</button>
+  <div class="home-sections">
+    <div class="home-section-btn" onclick="switchPage('search',document.querySelectorAll('.nav-btn')[1])">
+      <span class="sec-icon">&#128269;</span><span class="sec-name">Поиск</span><span class="sec-desc">Найти предмет</span>
+    </div>
+    <div class="home-section-btn" onclick="switchPage('watchlist',document.querySelectorAll('.nav-btn')[2])">
+      <span class="sec-icon">&#11088;</span><span class="sec-name">Избранное</span><span class="sec-desc">Отслеживание цен</span>
+    </div>
+    <div class="home-section-btn" onclick="switchPage('portfolio',document.querySelectorAll('.nav-btn')[3])">
+      <span class="sec-icon">&#128188;</span><span class="sec-name">Портфель</span><span class="sec-desc">Мои инвестиции</span>
+    </div>
+    <div class="home-section-btn" onclick="switchPage('chart',document.querySelectorAll('.nav-btn')[4])">
+      <span class="sec-icon">&#128200;</span><span class="sec-name">Графики</span><span class="sec-desc">История цен</span>
+    </div>
+  </div>
+  <div class="section-title">&#128293; Популярные предметы</div>
+  <div id="topItemsList"><div class="skeleton skeleton-item"></div><div class="skeleton skeleton-item"></div><div class="skeleton skeleton-item"></div></div>
+  <div class="section-title" style="margin-top:16px">&#128142; Самые дорогие</div>
+  <div id="expensiveItemsList"><div class="skeleton skeleton-item"></div><div class="skeleton skeleton-item"></div><div class="skeleton skeleton-item"></div></div>
+  <div class="cs2-banner" onclick="tg.openTelegramLink('https://t.me/cs2skinprice_bot')" style="margin-top:20px">
+    <span style="font-size:26px">&#127918;</span>
+    <div style="flex:1"><div style="font-size:13px;font-weight:700;color:#4a9eff">Бот для отслеживания цен на скины CS2</div><div style="font-size:11px;color:var(--text-dim)">@cs2skinprice_bot</div></div>
+    <span style="color:var(--text-dim);font-size:16px">&#8250;</span>
+  </div>
+  <div style="margin-top:4px">
+    <div class="home-section-btn" onclick="switchPage('notifhist',document.querySelectorAll('.nav-btn')[5])" style="flex-direction:row;justify-content:flex-start;gap:10px;padding:12px 14px">
+      <span class="sec-icon" style="font-size:20px">&#128276;</span>
+      <div style="text-align:left"><div class="sec-name">История уведомлений</div><div class="sec-desc">Срабатывания порогов</div></div>
+      <span style="margin-left:auto;color:var(--text-dim)">&#8250;</span>
+    </div>
+  </div>
+</div>
+
+<!-- SEARCH -->
+<div id="page-search" class="page">
+  <div class="search-box">
+    <input class="search-input" id="searchInput" placeholder="Название предмета..." autocomplete="off" onkeydown="if(event.key==='Enter')doSearch()">
+    <button class="search-btn" onclick="doSearch()">&#128269;</button>
+  </div>
+  <div id="compareBarSearch" class="compare-bar">
+    <span id="compareCount" style="font-size:13px;color:var(--gold)">Выбрано: 0</span>
+    <button class="btn btn-gold" style="flex:0;padding:8px 16px" onclick="openCompare()">&#9878; Сравнить</button>
+    <button class="btn btn-secondary" style="flex:0;padding:8px 12px" onclick="clearCompare()">&#10005;</button>
+  </div>
+  <div id="searchResults"></div>
+</div>
+
+<!-- WATCHLIST -->
+<div id="page-watchlist" class="page">
+  <div class="ptr-indicator" id="ptrWatchlist">&#8635; Отпустите для обновления</div>
+  <div id="watchlistContent"></div>
+</div>
+
+<!-- PORTFOLIO -->
+<div id="page-portfolio" class="page">
+  <div class="ptr-indicator" id="ptrPortfolio">&#8635; Отпустите для обновления</div>
+  <div id="portfolioContent"></div>
+</div>
+
+<!-- CHART -->
+<div id="page-chart" class="page">
+  <div class="graph-search">
+    <div class="search-box">
+      <input class="search-input" id="chartSearchInput" placeholder="Название предмета..." autocomplete="off" onkeydown="if(event.key==='Enter')doChartSearch()">
+      <button class="search-btn" onclick="doChartSearch()">&#128269;</button>
+    </div>
+    <div id="chartSearchResults"></div>
+  </div>
+  <div id="chartHint" style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-top:4px">
+    <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:10px">&#128200; Как работает график</div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7">График строится из твоих проверок цены. Каждый раз когда ты открываешь цену предмета — точка добавляется в историю.<br><br><b style="color:var(--text)">Как начать:</b><br>1. Найди предмет через Поиск<br>2. Открой его цену<br>3. Вернись сюда и введи название</div>
+  </div>
+  <div id="chartContainer" style="display:none">
+    <div class="chart-container">
+      <div class="chart-title" id="chartTitle">История цены</div>
+      <canvas id="priceChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIF HISTORY -->
+<div id="page-notifhist" class="page">
+  <div class="section-title">&#128276; История уведомлений <span class="section-title-action" onclick="clearNotifHistory()">Очистить</span></div>
+  <div id="notifHistList"></div>
+</div>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="switchPage('home',this)"><span class="icon">&#127968;</span>Главная</button>
+  <button class="nav-btn" onclick="switchPage('search',this)"><span class="icon">&#128269;</span>Поиск</button>
+  <button class="nav-btn" onclick="switchPage('watchlist',this)"><span class="icon">&#11088;</span>Избранное</button>
+  <button class="nav-btn" onclick="switchPage('portfolio',this)"><span class="icon">&#128188;</span>Портфель</button>
+  <button class="nav-btn" onclick="switchPage('chart',this)"><span class="icon">&#128200;</span>График</button>
+  <button class="nav-btn" onclick="switchPage('notifhist',this)"><span class="icon">&#128276;</span>Алерты</button>
+</nav>
+
+<button class="fab hidden" id="fab" onclick="openAddModal()">&#65291;</button>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title" id="addModalTitle">Добавить в Избранное</div>
+    <div id="addModalSearchBox">
+      <input class="modal-input" id="addModalSearch" placeholder="Поиск предмета..." onkeydown="if(event.key==='Enter')doModalSearch()">
+      <div id="addModalResults"></div>
+    </div>
+    <div id="addModalForm" style="display:none">
+      <div style="font-size:14px;margin-bottom:10px;color:var(--gold);font-weight:600" id="addModalItemName"></div>
+      <div id="addModalWatchlistFields">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">&#128201; Порог снижения (уведомление когда цена упадёт до)</div>
+        <input class="modal-input" id="addModalValueLow" type="number" step="0.01" min="0" placeholder="Например: 500 (или 0 — без уведомления)">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;margin-top:4px">&#128200; Порог роста (уведомление когда цена вырастет до)</div>
+        <input class="modal-input" id="addModalValueHigh" type="number" step="0.01" min="0" placeholder="Например: 2000 (или 0 — без уведомления)">
+      </div>
+      <div id="addModalPortfolioField" style="display:none">
+        <input class="modal-input" id="addModalValue" type="number" step="0.01" min="0">
+      </div>
+      <div class="modal-hint" id="addModalHint"></div>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" onclick="closeAddModal()">Отмена</button>
+        <button class="btn btn-primary" onclick="submitAdd()">Добавить</button>
+      </div>
+    </div>
+    <div id="addModalSearchButtons" class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closeAddModal()">Отмена</button>
+      <button class="btn btn-primary" onclick="doModalSearch()">&#128269; Найти</button>
+    </div>
+  </div>
+</div>
+
+<!-- CURRENCY MODAL -->
+<div class="modal-overlay" id="currencyModal">
+  <div class="modal">
+    <div class="modal-title">Выбрать валюту</div>
+    <div class="currency-list" id="currencyList"></div>
+    <div style="margin-top:12px"><button class="btn btn-secondary" onclick="closeCurrencyModal()">Закрыть</button></div>
+  </div>
+</div>
+
+<!-- PREMIUM MODAL -->
+<div class="modal-overlay" id="premiumModal">
+  <div class="modal premium-modal">
+    <div class="stars-icon">&#11088;</div>
+    <div class="premium-title">Dota 2 Tracker Premium</div>
+    <div style="background:linear-gradient(135deg,#1a1a2e,#2a1a0a);border:1px solid #c89b3c44;border-radius:10px;padding:14px;margin:12px 0">
+      <div style="font-size:22px;font-weight:900;color:#e8c870;text-align:center">200 &#11088; Stars</div>
+      <div style="font-size:12px;color:var(--text-dim);text-align:center;margin-top:4px">Разовая оплата &middot; Навсегда</div>
+    </div>
+    <div class="premium-features">
+      <div class="premium-feature"><span class="feat-icon">&#128269;</span> Безлимитные проверки цены</div>
+      <div class="premium-feature"><span class="feat-icon">&#11088;</span> Безлимитное Избранное</div>
+      <div class="premium-feature"><span class="feat-icon">&#128188;</span> Безлимитный портфель</div>
+      <div class="premium-feature"><span class="feat-icon">&#128683;</span> Без рекламы</div>
+      <div class="premium-feature"><span class="feat-icon">&#128200;</span> Уведомления о росте и снижении</div>
+    </div>
+    <div class="modal-buttons" style="flex-direction:column;gap:8px">
+      <button class="btn btn-stars" style="font-size:16px;padding:14px;font-weight:800" onclick="buyPremium()">&#11088; Купить Premium &mdash; 200 Stars</button>
+      <button class="btn btn-secondary" onclick="closePremiumModal()">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIMIT MODAL -->
+<div class="modal-overlay" id="limitModal">
+  <div class="modal" style="text-align:center">
+    <div style="font-size:48px;margin-bottom:10px">&#128274;</div>
+    <div class="modal-title" style="text-align:center">Лимит исчерпан</div>
+    <div class="modal-hint" id="limitModalText" style="margin-bottom:16px;font-size:14px;line-height:1.6"></div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-green" id="watchAdBtn" style="font-size:15px;padding:14px" onclick="watchAdForReward('price_checks')">&#128250; Смотреть рекламу (+3 проверки)</button>
+      <button class="btn btn-stars" style="font-size:15px;padding:14px;font-weight:800" onclick="closeLimitModal();openPremiumModal()">&#11088; Premium &mdash; безлимит навсегда</button>
+      <button class="btn btn-secondary" onclick="closeLimitModal()">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- COMPARE MODAL -->
+<div class="modal-overlay" id="compareModal">
+  <div class="modal">
+    <div class="modal-title">&#9878; Сравнение предметов</div>
+    <div id="compareContent"></div>
+    <div class="modal-buttons" style="margin-top:12px">
+      <button class="btn btn-secondary" onclick="closeCompareModal()">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var tg = window.Telegram.WebApp;
+tg.expand();
+var API_BASE = "https://exclusive-consoling-heavily.ngrok-free.dev";
+var ADSGRAM_BLOCK_ID = "33734";
+var initData = tg.initData;
+var currentCurrency = "RUB";
+var currentSymbol = "руб.";
+var currentPage = "home";
+var addModalMode = "watchlist";
+var addModalSelectedItem = null;
+var chartInstance = null;
+var portfolioChartInstance = null;
+var userIsPremium = false;
+var adController = null;
+var savedSearchHtml = "";
+var prevPage = null;
+var prevContent = null;
+var compareItems = [];
+var sparklineInstances = {};
+var watchlistSortMode = "default";
+var portfolioSortMode = "default";
+
+// ---- LOCAL STORAGE HELPERS ----
+function lsGet(key, def) { try { var v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : def; } catch(e) { return def; } }
+function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {} }
+
+// ---- PRICE CACHE ----
+function cachePrice(name, price) {
+  var cache = lsGet("dota_price_cache", {});
+  var prev = cache[name];
+  cache[name] = { price: price, ts: Date.now() };
+  lsSet("dota_price_cache", cache);
+  return prev ? prev.price : null;
+}
+function getCachedPrice(name) {
+  var cache = lsGet("dota_price_cache", {});
+  return cache[name] ? cache[name].price : null;
+}
+
+// ---- RECENTLY VIEWED ----
+function addRecent(name, icon, price) {
+  var list = lsGet("dota_recent", []);
+  list = list.filter(function(i) { return i.name !== name; });
+  list.unshift({ name: name, icon: icon || "", price: price || 0 });
+  if (list.length > 10) list = list.slice(0, 10);
+  lsSet("dota_recent", list);
+  renderRecentSection();
+}
+function clearRecent() { lsSet("dota_recent", []); renderRecentSection(); }
+function renderRecentSection() {
+  var list = lsGet("dota_recent", []);
+  var sec = document.getElementById("recentSection");
+  var el = document.getElementById("recentList");
+  if (!list.length) { sec.style.display = "none"; return; }
+  sec.style.display = "block";
+  el.innerHTML = list.map(function(item) {
+    var imgHtml = item.icon ? '<img src="https://community.akamai.steamstatic.com/economy/image/' + item.icon + '/62fx62f" alt="" onerror="this.style.display=\'none\'">' : "";
+    return '<div class="recent-chip" onclick="goToItemPrice(\'' + item.name.replace(/'/g,"\\'") + '\',\'' + (item.icon||"").replace(/'/g,"\\'") + '\')">' + imgHtml + '<span>' + item.name.split(" ").slice(0,3).join(" ") + '</span></div>';
+  }).join("");
+}
+
+// ---- NOTIF HISTORY ----
+function addNotifHistory(itemName, type, price, threshold, symbol) {
+  var hist = lsGet("dota_notif_hist", []);
+  hist.unshift({ item: itemName, type: type, price: price, threshold: threshold, symbol: symbol, ts: Date.now() });
+  if (hist.length > 50) hist = hist.slice(0, 50);
+  lsSet("dota_notif_hist", hist);
+}
+function clearNotifHistory() { lsSet("dota_notif_hist", []); renderNotifHistory(); }
+function renderNotifHistory() {
+  var hist = lsGet("dota_notif_hist", []);
+  var el = document.getElementById("notifHistList");
+  if (!hist.length) {
+    el.innerHTML = '<div class="empty-state"><div class="emoji">&#128276;</div><div>Пока нет срабатываний</div><div style="margin-top:6px;font-size:12px">Здесь появятся записи когда цена достигнет порога в Избранном</div></div>'; return;
+  }
+  el.innerHTML = hist.map(function(h) {
+    var icon = h.type === "low" ? "&#128201;" : "&#128200;";
+    var desc = h.type === "low" ? "Цена снизилась до " : "Цена выросла до ";
+    var d = new Date(h.ts);
+    var timeStr = d.getDate() + "." + String(d.getMonth()+1).padStart(2,"0") + " " + String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+    return '<div class="notif-item"><div class="notif-icon">' + icon + '</div><div class="notif-body"><div class="notif-name">' + h.item + '</div><div class="notif-desc">' + desc + fmt(h.price) + ' ' + h.symbol + ' (порог: ' + fmt(h.threshold) + ')</div><div class="notif-time">' + timeStr + '</div></div></div>';
+  }).join("");
+}
+
+// ---- API ----
+function apiFetch(path, options) {
+  options = options || {};
+  var url = (options.method && options.method !== "GET")
+    ? API_BASE + path + "?initData=" + encodeURIComponent(initData)
+    : API_BASE + path + (path.indexOf("?") >= 0 ? "&" : "?") + "initData=" + encodeURIComponent(initData);
+  return fetch(url, Object.assign({ headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" } }, options)).then(function(r) {
+    if (!r.ok) return r.json().catch(function() { return {}; }).then(function(e) {
+      var d = e.detail;
+      throw new Error(typeof d === "string" ? d : Array.isArray(d) ? d.map(function(x){return x.msg;}).join(", ") : "Ошибка " + r.status);
+    });
+    return r.json();
+  });
+}
+
+// ---- INIT ----
+function init() {
+  renderRecentSection();
+  apiFetch("/api/me").then(function(me) {
+    currentCurrency = me.currency; currentSymbol = me.currency_symbol;
+    document.getElementById("currencyBadge").textContent = currentCurrency;
+    renderCurrencyList(me.currencies);
+    window._meData = me; userIsPremium = me.premium || false;
+    if (userIsPremium) document.getElementById("premiumBadge").classList.add("show");
+    if (!userIsPremium && me.checks_left != null && me.checks_left <= 5)
+      showToast("Осталось " + me.checks_left + "/" + me.checks_limit + " проверок на этой неделе");
+    loadTopItems(); loadExpensiveItems();
+    if (!userIsPremium) setTimeout(initAdsgram, 3000);
+  }).catch(function(e) {
+    showToast("Ошибка подключения"); loadTopItems(); loadExpensiveItems();
+  });
+}
+
+// ---- PAGE SWITCH ----
+function switchPage(page, btn) {
+  document.querySelectorAll(".page").forEach(function(p) { p.classList.remove("active"); });
+  document.querySelectorAll(".nav-btn").forEach(function(b) { b.classList.remove("active"); });
+  document.getElementById("page-" + page).classList.add("active");
+  if (btn) btn.classList.add("active");
+  currentPage = page;
+  var fab = document.getElementById("fab");
+  if (page === "watchlist" || page === "portfolio") {
+    fab.classList.remove("hidden"); addModalMode = page === "watchlist" ? "watchlist" : "portfolio";
+  } else { fab.classList.add("hidden"); }
+  if (page === "watchlist") loadWatchlist();
+  if (page === "portfolio") loadPortfolio();
+  if (page === "chart") document.getElementById("chartHint").style.display = "block";
+  if (page === "notifhist") renderNotifHistory();
+}
+
+// ---- NAVIGATION ----
+function goToItemPrice(itemName, icon) {
+  prevPage = currentPage;
+  prevContent = prevPage === "search" ? document.getElementById("searchResults").innerHTML
+    : prevPage === "watchlist" ? document.getElementById("watchlistContent").innerHTML
+    : prevPage === "portfolio" ? document.getElementById("portfolioContent").innerHTML : null;
+  switchPage("search", document.querySelectorAll(".nav-btn")[1]);
+  showItemPrice(itemName, icon || "");
+}
+
+function goBack() {
+  if (!prevPage || prevPage === "search") {
+    document.getElementById("searchResults").innerHTML = prevContent || savedSearchHtml || "";
+    if (!prevContent && !savedSearchHtml) document.getElementById("searchInput").value = "";
+  } else if (prevPage === "home") {
+    switchPage("home", document.querySelectorAll(".nav-btn")[0]);
+  } else if (prevPage === "watchlist") {
+    switchPage("watchlist", document.querySelectorAll(".nav-btn")[2]);
+    if (prevContent) document.getElementById("watchlistContent").innerHTML = prevContent;
+  } else if (prevPage === "portfolio") {
+    switchPage("portfolio", document.querySelectorAll(".nav-btn")[3]);
+    if (prevContent) document.getElementById("portfolioContent").innerHTML = prevContent;
+  }
+  prevPage = null; prevContent = null;
+}
+
+// ---- IMAGE HELPERS ----
+function itemImgHtml(icon) {
+  if (!icon) return "";
+  return '<img class="top-item-img" src="https://community.akamai.steamstatic.com/economy/image/' + icon + '/62fx62f" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+}
+
+// ---- TOP ITEMS ----
+function renderItemList(items, containerId) {
+  var container = document.getElementById(containerId);
+  if (!items || !items.length) { container.innerHTML = '<div style="color:var(--text-dim);font-size:13px">Нет данных</div>'; return; }
+  container.innerHTML = items.map(function(item) {
+    var safeIcon = (item.icon || "").replace(/'/g, "\\'");
+    var prev = getCachedPrice(item.item_name);
+    var deltaHtml = "";
+    if (prev && prev !== item.lowest) {
+      var pct = ((item.lowest - prev) / prev * 100).toFixed(1);
+      deltaHtml = pct > 0
+        ? '<span class="delta-badge delta-up">&#9650;' + pct + '%</span>'
+        : '<span class="delta-badge delta-down">&#9660;' + Math.abs(pct) + '%</span>';
+    }
+    return '<div class="top-item" onclick="goToItemPrice(\'' + item.item_name.replace(/'/g,"\\'") + '\',\'' + safeIcon + '\')">' +
+      itemImgHtml(item.icon) + '<span class="top-item-name">' + item.item_name + '</span>' +
+      '<span class="top-item-price">' + fmt(item.lowest) + ' ' + item.symbol + deltaHtml + '</span></div>';
+  }).join("");
+}
+
+function loadTopItems() {
+  apiFetch("/api/top-items").then(function(d) { renderItemList(d.items, "topItemsList"); })
+    .catch(function() { document.getElementById("topItemsList").innerHTML = '<div style="color:var(--text-dim);font-size:13px">Не удалось загрузить</div>'; });
+}
+function loadExpensiveItems() {
+  apiFetch("/api/expensive-items").then(function(d) { renderItemList(d.items, "expensiveItemsList"); })
+    .catch(function() { document.getElementById("expensiveItemsList").innerHTML = '<div style="color:var(--text-dim);font-size:13px">Не удалось загрузить</div>'; });
+}
+
+// ---- SEARCH ----
+function doHomeSearch() {
+  var q = document.getElementById("homeSearchInput").value.trim(); if (!q) return;
+  document.getElementById("searchInput").value = q;
+  switchPage("search", document.querySelectorAll(".nav-btn")[1]); doSearch();
+}
+
+function doSearch() {
+  var q = document.getElementById("searchInput").value.trim(); if (!q) return;
+  savedSearchHtml = ""; prevContent = null; compareItems = []; updateCompareBar();
+  var container = document.getElementById("searchResults");
+  container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Поиск...</div></div>';
+  apiFetch("/api/search?q=" + encodeURIComponent(q)).then(function(data) {
+    if (!data.results.length) {
+      container.innerHTML = '<div class="empty-state"><div class="emoji">&#128533;</div><div>Ничего не найдено по &laquo;' + q + '&raquo;</div></div>'; return;
+    }
+    var itemNames = data.results.map(function(item) { return item.name || item; });
+    var html = '<div class="section-title">Результаты поиска <span class="section-title-action" style="font-size:11px;color:var(--text-dim)">&#9878; выберите для сравнения</span></div><div class="results-list">' +
+      data.results.map(function(item) {
+        var name = item.name || item; var icon = item.icon || "";
+        var imgHtml = icon ? '<img class="result-img" src="https://community.akamai.steamstatic.com/economy/image/' + icon + '/62fx62f" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : "";
+        var safeIcon = icon.replace(/'/g,"\\'");
+        return '<div class="result-item" id="ri_' + name.replace(/[^a-zA-Z0-9]/g,"_") + '">' +
+          '<div class="result-item-row">' + imgHtml +
+          '<span class="result-name" onclick="showItemPrice(\'' + name.replace(/'/g,"\\'") + '\',\'' + safeIcon + '\')">' + name + '</span>' +
+          '<div class="result-compare-check" id="chk_' + name.replace(/[^a-zA-Z0-9]/g,"_") + '" onclick="toggleCompare(\'' + name.replace(/'/g,"\\'") + '\',\'' + safeIcon + '\',this)" title="Добавить к сравнению"></div>' +
+          '<span class="result-arrow" onclick="showItemPrice(\'' + name.replace(/'/g,"\\'") + '\',\'' + safeIcon + '\')">&#8250;</span></div>' +
+          '<div id="price_' + name.replace(/[^a-zA-Z0-9]/g,"_") + '"></div></div>';
+      }).join("") + '</div>';
+    container.innerHTML = html; savedSearchHtml = html;
+    apiFetch("/api/price-preview?items=" + encodeURIComponent(itemNames.join(","))).then(function(pd) {
+      itemNames.forEach(function(name) {
+        var el = document.getElementById("price_" + name.replace(/[^a-zA-Z0-9]/g,"_"));
+        if (el && pd.prices[name]) el.innerHTML = '<span class="result-price">последняя цена: ' + fmt(pd.prices[name]) + ' ' + pd.symbol + '</span>';
+      });
+      savedSearchHtml = container.innerHTML;
+    }).catch(function() { savedSearchHtml = container.innerHTML; });
+  }).catch(function(e) { container.innerHTML = '<div class="empty-state"><div class="emoji">&#9888;&#65039;</div><div>' + e.message + '</div></div>'; });
+}
+
+// ---- COMPARE ----
+function toggleCompare(name, icon, el) {
+  var idx = compareItems.findIndex(function(i) { return i.name === name; });
+  if (idx >= 0) {
+    compareItems.splice(idx, 1);
+    el.classList.remove("checked"); el.textContent = "";
+  } else {
+    if (compareItems.length >= 3) { showToast("Максимум 3 предмета для сравнения"); return; }
+    compareItems.push({ name: name, icon: icon });
+    el.classList.add("checked"); el.textContent = "✓";
+  }
+  updateCompareBar();
+}
+function updateCompareBar() {
+  var bar = document.getElementById("compareBarSearch");
+  document.getElementById("compareCount").textContent = "Выбрано: " + compareItems.length;
+  bar.classList.toggle("visible", compareItems.length >= 2);
+}
+function clearCompare() {
+  compareItems = [];
+  document.querySelectorAll(".result-compare-check").forEach(function(el) { el.classList.remove("checked"); el.textContent = ""; });
+  updateCompareBar();
+}
+
+function openCompare() {
+  if (compareItems.length < 2) return;
+  var content = document.getElementById("compareContent");
+  content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById("compareModal").classList.add("open");
+  var promises = compareItems.map(function(item) {
+    return apiFetch("/api/price?item=" + encodeURIComponent(item.name)).then(function(d) {
+      return Object.assign(d, { icon: item.icon });
+    }).catch(function() { return { item_name: item.name, icon: item.icon, lowest: null, median: null, symbol: currentSymbol }; });
+  });
+  Promise.all(promises).then(function(results) {
+    var colsHtml = results.map(function(r) {
+      var imgHtml = r.icon ? '<img src="https://community.akamai.steamstatic.com/economy/image/' + r.icon + '/62fx62f" alt="" onerror="this.style.display=\'none\'">' : "";
+      return '<div class="compare-col">' + imgHtml +
+        '<div class="compare-col-name">' + r.item_name + '</div>' +
+        '<div class="compare-row"><span style="color:var(--text-dim)">Мин.</span><span style="color:var(--gold);font-weight:700">' + (r.lowest ? fmt(r.lowest) + ' ' + r.symbol : '—') + '</span></div>' +
+        '<div class="compare-row"><span style="color:var(--text-dim)">Медиана</span><span>' + (r.median ? fmt(r.median) + ' ' + r.symbol : '—') + '</span></div>' +
+        (r.volume ? '<div class="compare-row"><span style="color:var(--text-dim)">24ч</span><span>' + r.volume + '</span></div>' : '') +
+        '</div>';
+    }).join("");
+    content.innerHTML = '<div class="compare-grid">' + colsHtml + '</div>';
+  });
+}
+function closeCompareModal() { document.getElementById("compareModal").classList.remove("open"); }
+
+// ---- ITEM PRICE ----
+function showItemPrice(itemName, itemIcon) {
+  var container = document.getElementById("searchResults");
+  container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Загружаю цену...</div></div>';
+  apiFetch("/api/price?item=" + encodeURIComponent(itemName)).then(function(data) {
+    if (data.checks_left != null && window._meData) { window._meData.checks_left = data.checks_left; window._meData.checks_limit = data.checks_limit; }
+    var prevPrice = cachePrice(itemName, data.lowest);
+    addRecent(itemName, itemIcon, data.lowest);
+    var deltaHtml = "";
+    if (prevPrice && prevPrice !== data.lowest) {
+      var pct = ((data.lowest - prevPrice) / prevPrice * 100).toFixed(1);
+      deltaHtml = pct > 0
+        ? ' <span class="delta-badge delta-up">&#9650;' + pct + '%</span>'
+        : ' <span class="delta-badge delta-down">&#9660;' + Math.abs(pct) + '%</span>';
+    }
+    var checksLeft = !userIsPremium && data.checks_left != null ? data.checks_left : null;
+    var checksHtml = checksLeft != null ? '<div class="price-meta" style="margin-top:8px">Осталось проверок: <b>' + checksLeft + '/' + data.checks_limit + '</b> · <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">&#8734; PRO</span></div>' : "";
+    var iconHtml = itemIcon ? '<img class="item-icon-large" src="https://community.akamai.steamstatic.com/economy/image/' + itemIcon + '/128fx128f" onerror="this.style.display=\'none\'">' : "";
+    var steamName = encodeURIComponent(itemName);
+    container.innerHTML = '<div class="price-card">' + iconHtml +
+      '<div class="price-card-name">' + data.item_name + '</div>' +
+      '<div class="price-row"><span class="price-label">Минимальная цена</span><span class="price-value main">' + fmt(data.lowest) + ' ' + data.symbol + deltaHtml + '</span></div>' +
+      '<div class="price-row"><span class="price-label">Медианная цена</span><span class="price-value">' + fmt(data.median) + ' ' + data.symbol + '</span></div>' +
+      (data.volume ? '<div class="price-meta">Продано за 24ч: ' + data.volume + '</div>' : '') + checksHtml +
+      '<div class="price-actions">' +
+      '<button class="btn btn-secondary" onclick="goBack()">&#9664; Назад</button>' +
+      '<button class="btn btn-secondary" onclick="addToWatchlistQuick(\'' + itemName.replace(/'/g,"\\'") + '\')">&#11088;</button>' +
+      '<button class="btn btn-gold" onclick="addToPortfolioQuick(\'' + itemName.replace(/'/g,"\\'") + '\',' + data.lowest + ')">&#128188;</button>' +
+      '<button class="btn btn-blue" onclick="tg.openLink(\'https://steamcommunity.com/market/listings/570/' + steamName + '\')" title="Steam Market">&#127760;</button>' +
+      '<button class="btn btn-secondary" onclick="sharePrice(\'' + itemName.replace(/'/g,"\\'") + '\',' + data.lowest + ',\'' + data.symbol + '\')" title="Поделиться">&#128279;</button>' +
+      '</div></div>';
+  }).catch(function(e) {
+    if (e.message.indexOf("Лимит") >= 0 || e.message.indexOf("лимит") >= 0) { openLimitModal(e.message); }
+    else { container.innerHTML = '<div class="empty-state"><div class="emoji">&#9888;&#65039;</div><div>' + e.message + '</div><div style="margin-top:12px"><button class="btn btn-secondary" style="max-width:120px" onclick="goBack()">&#9664; Назад</button></div></div>'; }
+  });
+}
+
+function sharePrice(name, price, symbol) {
+  var text = "💎 " + name + "\n💰 " + fmt(price) + " " + symbol + "\n\n📊 Dota 2 Price Tracker — @Dota2PriceBot";
+  try {
+    tg.switchInlineQuery(name, ["users", "groups", "channels"]);
+  } catch(e) {
+    try { tg.openTelegramLink("https://t.me/share/url?url=https://t.me/Dota2PriceBot&text=" + encodeURIComponent(text)); }
+    catch(e2) { showToast("Цена: " + fmt(price) + " " + symbol); }
+  }
+}
+
+// ---- WATCHLIST ----
+var watchlistData = [];
+function loadWatchlist() {
+  var container = document.getElementById("watchlistContent");
+  container.innerHTML = '<div class="skeleton skeleton-item"></div><div class="skeleton skeleton-item"></div><div class="skeleton skeleton-item"></div>';
+  apiFetch("/api/watchlist").then(function(data) {
+    watchlistData = data.items;
+    renderWatchlist(data);
+  }).catch(function(e) { container.innerHTML = '<div class="empty-state"><div class="emoji">&#9888;&#65039;</div><div>' + e.message + '</div></div>'; });
+}
+
+function renderWatchlist(data) {
+  var container = document.getElementById("watchlistContent");
+  var items = (data || { items: watchlistData }).items.slice();
+  var html = "";
+
+  if (!userIsPremium) {
+    var used = items.length, bonus = (window._meData && window._meData.bonus_watchlist) || 0, limit = 7 + bonus, canWatchAd = limit < 10, bonusNote = bonus > 0 ? " (+" + bonus + " бонус)" : "";
+    if (used >= limit) {
+      html += '<div class="limit-banner"><span style="font-size:22px">&#128274;</span><div class="limit-banner-text">Использовано ' + used + '/' + limit + bonusNote + '.' + (canWatchAd ? ' <span style="cursor:pointer;color:#c89b3c" onclick="openWatchlistLimitModal(\'\')">&#128250; Реклама +1 слот</span> &middot;' : '') + ' <span style="cursor:pointer;color:#c89b3c" onclick="openPremiumModal()">&#11088; Premium</span></div></div>';
+    } else {
+      html += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">Слотов: ' + used + '/' + limit + bonusNote + (canWatchAd ? ' &middot; <span style="color:var(--gold);cursor:pointer" onclick="openWatchlistLimitModal(\'\')">&#128250; +1 слот за рекламу</span>' : '') + ' &middot; <span style="color:var(--gold);cursor:pointer" onclick="openPremiumModal()">&#8734; Premium</span></div>';
+    }
+  }
+
+  if (items.length > 1) {
+    html += '<div class="sort-bar">' +
+      '<div class="sort-chip' + (watchlistSortMode==="default"?" active":"") + '" onclick="sortWatchlist(\'default\')">По умолчанию</div>' +
+      '<div class="sort-chip' + (watchlistSortMode==="name"?" active":"") + '" onclick="sortWatchlist(\'name\')">А–Я</div>' +
+      '<div class="sort-chip' + (watchlistSortMode==="price_asc"?" active":"") + '" onclick="sortWatchlist(\'price_asc\')">Цена ↑</div>' +
+      '<div class="sort-chip' + (watchlistSortMode==="price_desc"?" active":"") + '" onclick="sortWatchlist(\'price_desc\')">Цена ↓</div>' +
+      '<div class="sort-chip' + (watchlistSortMode==="alert"?" active":"") + '" onclick="sortWatchlist(\'alert\')">Сначала алерты</div>' +
+      '</div>';
+  }
+
+  if (watchlistSortMode === "name") items.sort(function(a,b) { return a.item_name.localeCompare(b.item_name); });
+  else if (watchlistSortMode === "price_asc") items.sort(function(a,b) { return (a.current_price||0)-(b.current_price||0); });
+  else if (watchlistSortMode === "price_desc") items.sort(function(a,b) { return (b.current_price||0)-(a.current_price||0); });
+  else if (watchlistSortMode === "alert") items.sort(function(a,b) {
+    var aAlert = (a.threshold>0&&a.current_price&&a.current_price<=a.threshold)||(a.threshold_high>0&&a.current_price&&a.current_price>=a.threshold_high) ? 0 : 1;
+    var bAlert = (b.threshold>0&&b.current_price&&b.current_price<=b.threshold)||(b.threshold_high>0&&b.current_price&&b.current_price>=b.threshold_high) ? 0 : 1;
+    return aAlert - bAlert;
+  });
+
+  if (!items.length) {
+    html += '<div class="empty-state"><div class="emoji">&#11088;</div><div>Избранное пусто</div><div style="margin-top:6px;font-size:12px">Нажми + чтобы добавить предмет</div></div>';
+  } else {
+    html += items.map(function(item) {
+      var below = item.threshold > 0 && item.current_price && item.current_price <= item.threshold;
+      var above = item.threshold_high > 0 && item.current_price && item.current_price >= item.threshold_high;
+      if (below) addNotifHistory(item.item_name, "low", item.current_price, item.threshold, item.symbol);
+      if (above) addNotifHistory(item.item_name, "high", item.current_price, item.threshold_high, item.symbol);
+      var iconHtml = item.icon ? '<img class="watchlist-item-icon" src="https://community.akamai.steamstatic.com/economy/image/' + item.icon + '/62fx62f" alt="" onerror="this.style.display=\'none\'">' : "";
+      var sparkId = "spark_" + item.id;
+      return '<div class="item-card" onclick="goToItemPrice(\'' + item.item_name.replace(/'/g,"\\'") + '\',\'' + (item.icon||"").replace(/'/g,"\\'") + '\')" style="cursor:pointer">' +
+        iconHtml + '<div class="item-card-header"><div class="item-card-name">' + item.item_name + '</div><button class="item-card-delete"
