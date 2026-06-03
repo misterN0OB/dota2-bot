@@ -1163,7 +1163,6 @@ function watchAdForReward(rewardType) {
     return apiFetch("/api/ad-reward", { method: "POST", body: JSON.stringify({ reward_type: rewardType }) });
   }).then(function(result) {
     showToast(result.message || "Бонус начислен!");
-    if (rewardType === "price_checks" && window._meData) { window._meData.checks_left = result.checks_left; window._meData.checks_limit = result.checks_limit; }
     if (rewardType === "watchlist" && window._meData) { window._meData.bonus_watchlist = (window._meData.bonus_watchlist || 0) + 1; loadWatchlist(); }
   }).catch(function(e) {
     if (e && e.done === false) showToast("Нужно досмотреть рекламу до конца");
@@ -1227,7 +1226,7 @@ function setupPullToRefresh(pageId, ptrId, refreshFn) {
     pulling = false;
   });
 }
-setupPullToRefresh("page-home", "ptrHome", function() { loadTopItems(); loadExpensiveItems(); showToast("Обновляем..."); });
+setupPullToRefresh("page-home", "ptrHome", function() { loadTopItems(); loadExpensiveItems(); loadTopGrowth(); showToast("Обновляем..."); });
 setupPullToRefresh("page-watchlist", "ptrWatchlist", loadWatchlist);
 setupPullToRefresh("page-portfolio", "ptrPortfolio", loadPortfolio);
 
